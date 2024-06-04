@@ -62,7 +62,7 @@ const config = {
     caption: process.env.CAPTION || "『© 𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫』",
     author: process.env.PACK_AUTHOR || "",
     packname: process.env.PACK_NAME || "",
-    botname: process.env.BOT_NAME || "MarchéExpress",
+    botname: process.env.BOT_NAME || "MARKET-EXPRESS",
     ownername: process.env.OWNER_NAME || "𝐌𝐫 𝐀𝐥𝐛𝐞𝐫𝐧𝐨",
     errorChat: process.env.ERROR_CHAT || "",
     KOYEB_API: process.env.KOYEB_API || "false",

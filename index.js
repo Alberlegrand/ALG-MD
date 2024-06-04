@@ -23,7 +23,16 @@ async function connectToWhatsApp() {
             } else if (connection === 'open') {
                 console.log('opened connection');
                 const myProfileJid = config.owner + '@s.whatsapp.net';
-                await sock.sendMessage(myProfileJid, { text: 'Le bot est maintenant connecté.' });
+                const startMessage = `
+${config.botname} Connected
+
+Prefix  : [ ${config.prefix} ]
+Plugins : ${config.plugin}
+Mode    : Public
+Database: No DB
+  
+                `;
+                await sock.sendMessage(myProfileJid, { text: startMessage });
             }
         });
 
