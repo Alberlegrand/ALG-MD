@@ -8,6 +8,9 @@ yarn-error.log*
 # Ignorer les répertoires de dépendances
 node_modules/
 
+# Ignorer les répertoires de de baileys
+auth_info_baileys/
+
 # Ignorer les répertoires de construction
 dist/
 build/

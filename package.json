@@ -11,8 +11,11 @@
   "license": "ISC",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.4",
+    "dotenv": "^16.4.5",
+    "fs-extra": "^11.2.0",
+    "os": "^0.1.2",
+    "pretty-bytes": "^6.1.1",
     "qrcode-terminal": "^0.12.0"
   },
-  "devDependencies": {},
   "description": "MarchéExpress est votre compagnon ultime pour une expérience d'achat en ligne sans tracas sur WhatsApp. Avec MarchéExpress, vous pouvez parcourir une large sélection de produits, des articles ménagers aux gadgets high-tech, et passer des commandes directement depuis votre application WhatsApp préférée."
 }
