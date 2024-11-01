@@ -11,7 +11,7 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
     const end = new Date().getTime();
     const responseTime = (end - start) / 1000;
 
-    const text = `🧿𝗥𝗢𝗠𝗘𝗞-𝗫𝗗🪀: ${responseTime.toFixed(2)} s_*`;
+    const text = `🧿ALG-MD🪀: ${responseTime.toFixed(2)} s_*`;
     sock.sendMessage(m.from, { text }, { quoted: m });
   }
 }

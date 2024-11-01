@@ -26,7 +26,7 @@ const alive = async (m, Matrix) => {
     image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
     const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
     
-    const uptimeMessage = `*🧿𝗥𝗢𝗠𝗘𝗞-𝗫𝗗🪀 Status Overview*
+    const uptimeMessage = `*🧿ALG-MD🪀 Status Overview*
 _________________________________________
 
 *🌅 ${days} Day(s)*
@@ -65,7 +65,7 @@ _________________________________________
               text: uptimeMessage
             }),
             footer: proto.Message.InteractiveMessage.Footer.create({
-              text: "© ᴘᴏᴡᴇʀᴅ ʙʏ roalg-xᴅ-ʙᴏᴛ"
+              text: "© ᴘᴏᴡᴇʀᴅ ʙʏ ALG-mᴅ-ʙᴏᴛ"
             }),
             header: proto.Message.InteractiveMessage.Header.create({
               ...(await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer })),

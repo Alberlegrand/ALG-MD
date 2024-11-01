@@ -37,9 +37,9 @@ const seconds = Math.floor(uptime % 60); // Calculate seconds
 const uptimeMessage = `*I am alive now since ${day}d ${hours}h ${minutes}m ${seconds}s*`;
 const runMessage = `*☀️ ${day} Day*\n*🕐 ${hours} Hour*\n*⏰ ${minutes} Minutes*\n*⏱️ ${seconds} Seconds*\n`;
 
-const xtime = moment.tz("Africa/Moçambique").format("HH:mm:ss");
-const xdate = moment.tz("Africa/Moçambique").format("DD/MM/YYYY");
-const time2 = moment().tz("Africa/Moçambique").format("HH:mm:ss");
+const xtime = moment.tz("Port-au-Prince, Haiti").format("HH:mm:ss");
+const xdate = moment.tz("Port-au-Prince, Haiti").format("DD/MM/YYYY");
+const time2 = moment().tz("Port-au-Prince, Haiti").format("HH:mm:ss");
 let pushwish = "";
 
 if (time2 < "05:00:00") {
@@ -65,18 +65,18 @@ const test = async (m, Matrix) => {
     if (paramsJson) {
       const params = JSON.parse(paramsJson);
       selectedListId = params.id;
-     // console.log(selectedListId);
+      // console.log(selectedListId);
     }
   }
   const selectedId = selectedListId || selectedButtonId;
-  
+
   const prefix = config.PREFIX;
-const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-       
-       const mode = config.MODE === 'public' ? 'public' : 'private';
-       const pref = config.PREFIX;
-           
-        const validCommands = ['list', 'help', 'menu'];
+  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+
+  const mode = config.MODE === 'public' ? 'public' : 'private';
+  const pref = config.PREFIX;
+
+  const validCommands = ['list', 'help', 'menu'];
 
   if (validCommands.includes(cmd)) {
     let msg = generateWAMessageFromContent(m.from, {
@@ -89,10 +89,10 @@ const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0
           interactiveMessage: proto.Message.InteractiveMessage.create({
             body: proto.Message.InteractiveMessage.Body.create({
               text: `╭─────────────━┈⊷
-│🪀 ʙᴏᴛ ɴᴀᴍᴇ: *𝗥𝗢𝗠𝗘𝗞-𝗫𝗗* 
+│🪀 ʙᴏᴛ ɴᴀᴍᴇ: *ALG-MD* 
 │🪀 ᴠᴇʀꜱɪᴏɴ: 2.2.0
 │🪀 ᴏᴡɴᴇʀ : *ALG-MD*      
-│🪀 ɴᴜᴍʙᴇʀ: 919341378016
+│🪀 ɴᴜᴍʙᴇʀ: 50944727644
 │🪀 ᴘʟᴀᴛғᴏʀᴍ: *${os.platform()}*
 │🪀 ᴍᴏᴅᴇ: *${mode}*
 │🪀 ᴘʀᴇғɪx: [${pref}]
@@ -102,28 +102,28 @@ const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0
               text: "©POWERED BY 𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫"
             }),
             header: proto.Message.InteractiveMessage.Header.create({
-                ...(await prepareWAMessageMedia({ image : fs.readFileSync('./src/roalg.jpg')}, { upload: Matrix.waUploadToServer})), 
-                  title: ``,
-                  gifPlayback: true,
-                  subtitle: "",
-                  hasMediaAttachment: false  
-                }),
+              ...(await prepareWAMessageMedia({ image: fs.readFileSync('./src/roalg.jpg') }, { upload: Matrix.waUploadToServer })),
+              title: ``,
+              gifPlayback: true,
+              subtitle: "",
+              hasMediaAttachment: false
+            }),
             nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
               buttons: [
                 {
-          "name": "quick_reply",
-          "buttonParamsJson": JSON.stringify({
-            display_text: "ALIVE",
-            id: `${prefix}alive`
-          })
-        },
-        {
-          "name": "quick_reply",
-          "buttonParamsJson": JSON.stringify({
-            display_text: "PING",
-            id: `${prefix}ping`
-          })
-        },
+                  "name": "quick_reply",
+                  "buttonParamsJson": JSON.stringify({
+                    display_text: "ALIVE",
+                    id: `${prefix}alive`
+                  })
+                },
+                {
+                  "name": "quick_reply",
+                  "buttonParamsJson": JSON.stringify({
+                    display_text: "PING",
+                    id: `${prefix}ping`
+                  })
+                },
                 {
                   "name": "single_select",
                   "buttonParamsJson": `{"title":"𝚻𝚫𝚸 𝐅𝚯𝚪 𝚯𝚸𝚵𝚴 𝚳𝚵𝚴𝐔",
@@ -198,16 +198,16 @@ const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0
               ],
             }),
             contextInfo: {
-                  quotedMessage: m.message,
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
+              quotedMessage: m.message,
+              mentionedJid: [m.sender],
+              forwardingScore: 999,
+              isForwarded: true,
+              forwardedNewsletterMessageInfo: {
+                newsletterJid: '120363321472746562@newsletter',
+                newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+                serverMessageId: 143
               }
+            }
           }),
         },
       },
@@ -217,8 +217,8 @@ const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0
       messageId: msg.key.id
     });
   }
-      if (selectedId == "View All Menu") {
-        const str = `hey ${m.pushName} ${pushwish}
+  if (selectedId == "View All Menu") {
+    const str = `hey ${m.pushName} ${pushwish}
 ╭─────────────━┈⊷
 │🪀 ʙᴏᴛ ɴᴀᴍᴇ: *ALG-MD*
 │🪀 ᴠᴇʀꜱɪᴏɴ: 2.2.3
@@ -328,42 +328,40 @@ const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0
 ✰ ${prefix}GITHUBSTALK
 ╰━━━━━━━━━━━━━━━⪼
    `;
-        let fgg = {
-            key: {
-                fromMe: false,
-                participant: `0@s.whatsapp.net`,
-                remoteJid: "status@broadcast"
-            },
-            message: {
-                contactMessage: {
-                    displayName: `𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫`,
-                    vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:'𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫'\nitem1.TEL;waid=${
-                        m.sender.split("@")[0]
-                    }:${
-                        m.sender.split("@")[0]
-                    }\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
-                }
-            }
-        };
-       let { key } = await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg2.jpg'), 
-  caption: str, 
-  contextInfo: { 
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: fgg
-});
-}
-   if ( selectedId == "Downloader Menu") {
-     const str = `
+    let fgg = {
+      key: {
+        fromMe: false,
+        participant: `0@s.whatsapp.net`,
+        remoteJid: "status@broadcast"
+      },
+      message: {
+        contactMessage: {
+          displayName: `𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫`,
+          vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:'𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫'\nitem1.TEL;waid=${m.sender.split("@")[0]
+            }:${m.sender.split("@")[0]
+            }\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+        }
+      }
+    };
+    let { key } = await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg2.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: fgg
+    });
+  }
+  if (selectedId == "Downloader Menu") {
+    const str = `
 ╭━❮  DOWNLOAD  ❯━╮
 ✰ ${prefix}APK
 ✰ ${prefix}FACEBOOK 
@@ -381,26 +379,26 @@ const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0
 ✰ ${prefix}YTMP4DOC
 ✰ ${prefix}TIKTOK 
 ╰━━━━━━━━━━━━━━━⪼`
-await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
-   
-   if ( selectedId == "Group Menu") {
-     const str = `
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
+
+  if (selectedId == "Group Menu") {
+    const str = `
 ╭━❮  GRUOP  ❯━╮
 ✰ ${prefix}LINKGROUP 
 ✰ ${prefix}SETPPGC 
@@ -419,21 +417,21 @@ await Matrix.sendMessage(m.from, {
 ✰ ${prefix}GETBIO 
 ╰━━━━━━━━━━━━━━━⪼
      `
-     await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-    mentionedJid: [m.sender], 
-    forwardingScore: 9999,
-    isForwarded: true,
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 9999,
+        isForwarded: true,
+      }
+    }, {
+      quoted: m
+    });
   }
-}, {
-  quoted: m
-});
-}
-   
-   if (selectedId == "Main Menu") {
-     const str =`
+
+  if (selectedId == "Main Menu") {
+    const str = `
 
 ╭━❮  MAIN  ❯━╮
 ✰ ${prefix}PING
@@ -442,26 +440,26 @@ await Matrix.sendMessage(m.from, {
 ✰ ${prefix}MENU
 ✰ ${prefix}INFOBOT
 ╰━━━━━━━━━━━━━━━⪼`
-await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
-   
-   if (selectedId == "Owner Menu") {
-     const str = `
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
+
+  if (selectedId == "Owner Menu") {
+    const str = `
 ╭━❮  OWNER  ❯━╮
 ✰ ${prefix}JOIN
 ✰ ${prefix}LEAVE
@@ -478,26 +476,26 @@ await Matrix.sendMessage(m.from, {
 ✰ ${prefix}AUTOREAD
 ✰ ${prefix}AUTOVIEW 
 ╰━━━━━━━━━━━━━━━⪼`
-await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
-   
-   if (selectedId == "Search Menu") {
-     const str =`
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
+
+  if (selectedId == "Search Menu") {
+    const str = `
 ╭━❮  SEARCH  ❯━╮
 ✰ ${prefix}PLAY
 ✰ ${prefix}YTS
@@ -511,51 +509,51 @@ await Matrix.sendMessage(m.from, {
 ✰ ${prefix}RINGTONE 
 ✰ ${prefix}LYRICS
 ╰━━━━━━━━━━━━━━━⪼`
-await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
-   if (selectedId == "Stalk Menu") {
-     const str =`
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
+  if (selectedId == "Stalk Menu") {
+    const str = `
 ╭━❮  STALK  ❯━╮
 ✰ ${prefix}NOWA
 ✰ ${prefix}TRUECALLER 
 ✰ ${prefix}INSTASTALK 
 ✰ ${prefix}GITHUBSTALK 
 ╰━━━━━━━━━━━━━━━⪼`
-await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
-   
-   if (selectedId == "Tool Menu") {
-     const str =`
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
+
+  if (selectedId == "Tool Menu") {
+    const str = `
 ╭━❮  TOOL  ❯━╮
 ✰ ${prefix}CALCULATOR 
 ✰ ${prefix}TEMPMAIL 
@@ -564,26 +562,26 @@ await Matrix.sendMessage(m.from, {
 ✰ ${prefix}TRT
 ✰ ${prefix}TTS
 ╰━━━━━━━━━━━━━━━⪼`
-await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
-   
-   if (selectedId == "Ai Menu") {
-     const str =`
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
+
+  if (selectedId == "Ai Menu") {
+    const str = `
 ╭━❮  AI  ❯━╮
 ✰ ${prefix}AI
 ✰ ${prefix}BUG
@@ -593,26 +591,26 @@ await Matrix.sendMessage(m.from, {
 ✰ ${prefix}REMINI
 ✰ ${prefix}GEMINI
 ╰━━━━━━━━━━━━━━━⪼`
-await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
-   
-   if (selectedId == "Converter Menu") {
-     const str =`
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
+
+  if (selectedId == "Converter Menu") {
+    const str = `
 ╭━❮  CONVERTER  ❯━╮
 ✰ ${prefix}ATTP
 ✰ ${prefix}ATTP2 
@@ -623,23 +621,23 @@ await Matrix.sendMessage(m.from, {
 ✰ ${prefix}MP3
 ╰━━━━━━━━━━━━━━━⪼
      `
-     await Matrix.sendMessage(m.from, {
-  image: fs.readFileSync('./src/roalg1.jpg'), 
-  caption: str, 
-  contextInfo: {
-                  mentionedJid: [m.sender], 
-                  forwardingScore: 999,
-                  isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                  newsletterJid: '120363321472746562@newsletter',
-                  newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
-                  serverMessageId: 143
-                }
-              }
-}, {
-  quoted: m
-});
-}
+    await Matrix.sendMessage(m.from, {
+      image: fs.readFileSync('./src/roalg1.jpg'),
+      caption: str,
+      contextInfo: {
+        mentionedJid: [m.sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363321472746562@newsletter',
+          newsletterName: "𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫",
+          serverMessageId: 143
+        }
+      }
+    }, {
+      quoted: m
+    });
+  }
 };
 
 export default test;

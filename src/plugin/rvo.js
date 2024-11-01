@@ -23,7 +23,7 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
     const type = Object.keys(msg)[0];
     
     const originalCaption = msg[type].caption || '';
-    const newCaption = `${originalCaption}\n\n> ©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 🧿𝗥𝗢𝗠𝗘𝗞-𝗫𝗗🪀`;
+    const newCaption = `${originalCaption}\n\n> ©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 🧿ALG-MD🪀`;
 
 
     // Download the media content
