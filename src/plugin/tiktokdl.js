@@ -76,10 +76,10 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
             },
             interactiveMessage: proto.Message.InteractiveMessage.create({
               body: proto.Message.InteractiveMessage.Body.create({
-                text: `𝐑𝐎𝐌𝐄𝐊 𝐗𝐃 TikTok Download\n\nTitle: ${currentResult.data.title}\nAuthor: ${currentResult.data.author.nickname}\nViews: ${currentResult.data.view}\nDuration: ${currentResult.data.duration}s\n`
+                text: `ALG MD TikTok Download\n\nTitle: ${currentResult.data.title}\nAuthor: ${currentResult.data.author.nickname}\nViews: ${currentResult.data.view}\nDuration: ${currentResult.data.duration}s\n`
               }),
               footer: proto.Message.InteractiveMessage.Footer.create({
-                text: "©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 𝐑𝐎𝐌𝐄𝐊 𝐗𝐃"
+                text: "©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 ALG MD"
               }),
               header: proto.Message.InteractiveMessage.Header.create({
                  ...(await prepareWAMessageMedia({ image: { url: `https://i.imgur.com/wZj8PVg.jpeg` } }, { upload: Matrix.waUploadToServer })),
@@ -137,9 +137,9 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
           const fileSizeInMB = finalMediaBuffer.length / (1024 * 1024);
 
           if (type === 'video' && fileSizeInMB <= 300) {
-            content = { video: finalMediaBuffer, mimetype: 'video/mp4', caption: '> ©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 𝐑𝐎𝐌𝐄𝐊 𝐗𝐃' };
+            content = { video: finalMediaBuffer, mimetype: 'video/mp4', caption: '> ©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 ALG MD' };
           } else if (type === 'audio' && fileSizeInMB <= 300) {
-            content = { audio: finalMediaBuffer, mimetype: 'audio/mpeg', caption: '> ©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘𝐑𝐎𝐌𝐄𝐊 𝐗𝐃' };
+            content = { audio: finalMediaBuffer, mimetype: 'audio/mpeg', caption: '> ©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘ALG MD' };
           }
 
           await Matrix.sendMessage(m.from, content, { quoted: m });

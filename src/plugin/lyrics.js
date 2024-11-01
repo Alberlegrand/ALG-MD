@@ -70,7 +70,7 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
                   text: lyrics
                 }),
                 footer: proto.Message.InteractiveMessage.Footer.create({
-                  text: "> *©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 🐼𝐑𝐎𝐌𝐄𝐊 𝐗𝐃🐠"
+                  text: "> *©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 🐼ALG MD🐠"
                 }),
                 header: proto.Message.InteractiveMessage.Header.create({
                   title: "",

@@ -20,7 +20,7 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
 
       if (gdriveInfo && gdriveInfo.status && gdriveInfo.data) {
         const mediaUrl = gdriveInfo.data;
-        const caption = `©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 𝐑𝐎𝐌𝐄𝐊 𝐗𝐃`;
+        const caption = `©𝐏𝐎𝐖𝐄𝐑𝐄𝐃 𝐁𝐘 ALG MD`;
 
         // Inferring the file type based on the file extension
         const extension = mediaUrl.split('.').pop().toLowerCase();

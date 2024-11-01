@@ -83,7 +83,7 @@ _________________________________________
               isForwarded: true,
               forwardedNewsletterMessageInfo: {
                 newsletterJid: '120363321472746562@newsletter',
-                newsletterName: "𝐑𝐎𝐌𝐄𝐊 𝐗𝐃",
+                newsletterName: "ALG MD",
                 serverMessageId: 143
               }
             }

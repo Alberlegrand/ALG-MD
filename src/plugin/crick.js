@@ -28,7 +28,7 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
       const result = response.data;
 
       let formattedResult = `╭══════════════•∞•══╮\n`;
-      formattedResult += `│⿻   *🐼𝐑𝐎𝐌𝐄𝐊 𝐗𝐃🐠*\n`;
+      formattedResult += `│⿻   *🐼ALG MD🐠*\n`;
       formattedResult += `│⿻   *LIVE MATCH INFO* ✨\n`;
       formattedResult += `│⿻\n`;
 
