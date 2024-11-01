@@ -11,7 +11,7 @@
 <hr>
 <p align="center">
 <a href="https://github.com/Alberlegrand/ALG-MD">
-    <img src="https://files.catbox.moe/hg86c0.jpg">
+    <img src="https://files.catbox.moe/hg6c0.jpg">
   </a>
 
 
