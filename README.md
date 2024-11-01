@@ -72,16 +72,15 @@
 
 
 
-   <a href="https://github.com/Alberlegrand/"><img src="https://files.catbox.moe/fgpxbl.jpg" width=80 height=80></a>   
+   <a href="https://github.com/Alberlegrand/"><img src="https://files.catbox.moe/fgpbl.jpg" width=80 height=80></a>   
 
 |**[`ALG-MD`](https://github.com/Alberlegrand)**|
 
-## 👑 `ALG-MD 𝐁𝐎𝐓 𝐎𝐖𝐍𝐄𝐑`👨 
+## 👑 `Mr Alberno 𝐁𝐎𝐓 𝐎𝐖𝐍𝐄𝐑`👨 
 
 
 ## DON'T FORGET TO TO BUY ALG COFFEE AND BOT UPDATES 🎉🎉
 - **Donate:** [Buy Me A Coffee](buymeacoffee.com/ALGbhai)
-- and check his bot ##🚀BOT🎉[https://github.com/ALG-Xsid/ALG-MD-V2)
 
  <br>
  </p>
