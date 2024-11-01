@@ -1,4 +1,4 @@
-import { serialize, decodeJid } from '../../../ALG-MD-main/lib/Serializer.js';
+import { serialize, decodeJid } from '../../../ALG-MD/lib/Serializer.js';
 import path from 'path';
 import fs from 'fs/promises';
 import config from '../../../ALG-MD-main/config.cjs';
