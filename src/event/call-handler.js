@@ -1,4 +1,4 @@
-import config from '../../../ALG-MD-main/config.cjs';
+import config from '../../config.cjs';
 
 const Callupdate = async (json, sock) => {
    for (const id of json) {
