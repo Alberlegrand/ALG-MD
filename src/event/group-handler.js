@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import config from '../../../ALG-MD/config.cjs';
+import config from '../../ALG-MD/config.cjs';
 export default async function GroupParticipants(sock, { id, participants, action }) {
    try {
       const metadata = await sock.groupMetadata(id)
