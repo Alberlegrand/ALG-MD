@@ -1,7 +1,7 @@
 import { serialize, decodeJid } from '../../../ALG-MD/lib/Serializer.js';
 import path from 'path';
 import fs from 'fs/promises';
-import config from '../../ALG-MD-main/config.cjs';
+import config from '../../config.cjs';
 import { smsg } from '../../../ALG-MD-main/lib/myfunc.cjs';
 import { handleAntilink } from './antilink.js';
 import { fileURLToPath } from 'url';
