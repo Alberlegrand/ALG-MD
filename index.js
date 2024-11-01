@@ -144,7 +144,7 @@ async function start() {
             
             if (config.AUTO_STATUS_REPLY) {
                 const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot By ALG-MD';
-                await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: alg });
+                //await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: alg });
             }
         }
     } catch (err) {
