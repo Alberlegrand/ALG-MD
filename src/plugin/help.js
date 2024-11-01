@@ -102,7 +102,7 @@ const test = async (m, Matrix) => {
               text: "©POWERED BY 𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫"
             }),
             header: proto.Message.InteractiveMessage.Header.create({
-              ...(await prepareWAMessageMedia({ image: fs.readFileSync('./src/roalg.jpg') }, { upload: Matrix.waUploadToServer })),
+              ...(await prepareWAMessageMedia({ image: fs.readFileSync('./src/hitdev.jpg') }, { upload: Matrix.waUploadToServer })),
               title: ``,
               gifPlayback: true,
               subtitle: "",
@@ -344,7 +344,7 @@ const test = async (m, Matrix) => {
       }
     };
     let { key } = await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg2.jpg'),
+      image: fs.readFileSync('./src/hitdev2.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -380,7 +380,7 @@ const test = async (m, Matrix) => {
 ✰ ${prefix}TIKTOK 
 ╰━━━━━━━━━━━━━━━⪼`
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -418,7 +418,7 @@ const test = async (m, Matrix) => {
 ╰━━━━━━━━━━━━━━━⪼
      `
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -441,7 +441,7 @@ const test = async (m, Matrix) => {
 ✰ ${prefix}INFOBOT
 ╰━━━━━━━━━━━━━━━⪼`
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -477,7 +477,7 @@ const test = async (m, Matrix) => {
 ✰ ${prefix}AUTOVIEW 
 ╰━━━━━━━━━━━━━━━⪼`
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -510,7 +510,7 @@ const test = async (m, Matrix) => {
 ✰ ${prefix}LYRICS
 ╰━━━━━━━━━━━━━━━⪼`
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -535,7 +535,7 @@ const test = async (m, Matrix) => {
 ✰ ${prefix}GITHUBSTALK 
 ╰━━━━━━━━━━━━━━━⪼`
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -563,7 +563,7 @@ const test = async (m, Matrix) => {
 ✰ ${prefix}TTS
 ╰━━━━━━━━━━━━━━━⪼`
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -592,7 +592,7 @@ const test = async (m, Matrix) => {
 ✰ ${prefix}GEMINI
 ╰━━━━━━━━━━━━━━━⪼`
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
@@ -622,7 +622,7 @@ const test = async (m, Matrix) => {
 ╰━━━━━━━━━━━━━━━⪼
      `
     await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/roalg1.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],
