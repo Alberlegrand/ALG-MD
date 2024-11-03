@@ -10,9 +10,15 @@ const alive = async (m, Matrix) => {
   const minutes = Math.floor((uptimeSeconds % 3600) / 60);
   const seconds = Math.floor(uptimeSeconds % 60);
   const timeString = `${String(days).padStart(2, '0')}-${String(hours).padStart(2, '0')}-${String(minutes).padStart(2, '0')}-${String(seconds).padStart(2, '0')}`;
+
   const prefix = config.PREFIX;
-  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-  const text = m.body.slice(prefix.length + cmd.length).trim();
+
+  // Utilisation de regex pour extraire la commande et le texte
+  const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)\\s*(.*)`);
+  const match = m.body.match(commandRegex);
+
+  const cmd = match ? match[1].toLowerCase() : '';
+  const text = match ? match[2].trim() : '';
 
   if (['alive', 'uptime', 'runtime'].includes(cmd)) {
     const width = 800;
@@ -25,7 +31,7 @@ const alive = async (m, Matrix) => {
     const y = (height / 2) - (textHeight / 2);
     image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
     const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
-    
+
     const uptimeMessage = `*🧿ALG-MD🪀 Status Overview*
 _________________________________________
 
@@ -35,7 +41,7 @@ _________________________________________
 *⏰ ${seconds} Second(s)*
 _________________________________________
 `;
-    
+
     const buttons = [
       {
         "name": "quick_reply",
