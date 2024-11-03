@@ -7,13 +7,19 @@ let scheduledTasks = {};
 const groupSetting = async (m, gss) => {
   try {
     const prefix = config.PREFIX;
-const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-const text = m.body.slice(prefix.length + cmd.length).trim();
+    
+    // Utilisation de regex pour extraire la commande et le texte
+    const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)\\s*(.*)`);
+    const match = m.body.match(commandRegex);
+
+    const cmd = match ? match[1].toLowerCase() : '';
+    const text = match ? match[2].trim() : '';
 
     const validCommands = ['group'];
     if (!validCommands.includes(cmd)) return;
 
     if (!m.isGroup) return m.reply("*❌ THIS COMMAND CAN ONLY BE USED IN GROUPS*");
+
     const groupMetadata = await gss.groupMetadata(m.from);
     const participants = groupMetadata.participants;
     const botNumber = await gss.decodeJid(gss.user.id);
@@ -23,13 +29,13 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
     if (!botAdmin) return m.reply("*❌ BOT MUST BE AN ADMIN TO USE THIS COMMAND*");
     if (!senderAdmin) return m.reply("*❌ YOU MUST BE AN ADMIN TO USE THIS COMMAND*");
 
-    const args = m.body.slice(prefix.length + cmd.length).trim().split(/\s+/);
+    const args = text.split(/\s+/); // Sépare le texte en arguments
     if (args.length < 1) return m.reply(`Please specify a setting (open/close) and optionally a time.\n\nExample:\n*${prefix + cmd} open* or *${prefix + cmd} open 04:00 PM*`);
 
     const groupSetting = args[0].toLowerCase();
-    const time = args.slice(1).join(' ');
+    const time = args.slice(1).join(' '); // Récupérer le reste du texte après la commande
 
-    // Handle immediate setting if no time is provided
+    // Gérer le paramètre immédiat si aucun temps n'est fourni
     if (!time) {
       if (groupSetting === 'close') {
         await gss.groupSettingUpdate(m.from, 'announcement');
@@ -42,18 +48,18 @@ const text = m.body.slice(prefix.length + cmd.length).trim();
       }
     }
 
-    // Check if the provided time is valid
+    // Vérifier si le temps fourni est valide
     if (!/^\d{1,2}:\d{2}\s*(?:AM|PM)$/i.test(time)) {
       return m.reply(`Invalid time format. Use HH:mm AM/PM format.\n\nExample:\n*${prefix + cmd} open 04:00 PM*`);
     }
 
-    // Convert time to 24-hour format
+    // Convertir le temps au format 24 heures
     const [hour, minute] = moment(time, ['h:mm A', 'hh:mm A']).format('HH:mm').split(':').map(Number);
     const cronTime = `${minute} ${hour} * * *`;
 
     console.log(`Scheduling ${groupSetting} at ${cronTime} IST`);
 
-    // Clear any existing scheduled task for this group
+    // Arrêter toute tâche planifiée existante pour ce groupe
     if (scheduledTasks[m.from]) {
       scheduledTasks[m.from].stop();
       delete scheduledTasks[m.from];
