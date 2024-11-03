@@ -7,50 +7,50 @@ import config from '../../config.cjs';
 
 const __filename = new URL(import.meta.url).pathname;
 const __dirname = path.dirname(__filename);
-const sportsHistoryFile = path.resolve(__dirname, '../sports_chat_history.json');
+const chatHistoryFile = path.resolve(__dirname, '../ai_chat_history.json');
 
-const aiSystemPrompt = "You are a helpful assistant for providing live sports updates.";
+const aiSystemPrompt = "You are a helpful assistant for sports inquiries.";
 
-async function readSportsHistoryFromFile() {
+async function readChatHistoryFromFile() {
     try {
-        const data = await fs.readFile(sportsHistoryFile, "utf-8");
+        const data = await fs.readFile(chatHistoryFile, "utf-8");
         return JSON.parse(data);
     } catch (err) {
         return {};
     }
 }
 
-async function writeSportsHistoryToFile(sportsHistory) {
+async function writeChatHistoryToFile(chatHistory) {
     try {
-        await fs.writeFile(sportsHistoryFile, JSON.stringify(sportsHistory, null, 2));
+        await fs.writeFile(chatHistoryFile, JSON.stringify(chatHistory, null, 2));
     } catch (err) {
-        console.error('Error writing sports history to file:', err);
+        console.error('Error writing chat history to file:', err);
     }
 }
 
-async function updateSportsHistory(sportsHistory, sender, message) {
-    if (!sportsHistory[sender]) {
-        sportsHistory[sender] = [];
+async function updateChatHistory(chatHistory, sender, message) {
+    if (!chatHistory[sender]) {
+        chatHistory[sender] = [];
     }
-    sportsHistory[sender].push(message);
-    if (sportsHistory[sender].length > 20) {
-        sportsHistory[sender].shift();
+    chatHistory[sender].push(message);
+    if (chatHistory[sender].length > 20) {
+        chatHistory[sender].shift();
     }
-    await writeSportsHistoryToFile(sportsHistory);
+    await writeChatHistoryToFile(chatHistory);
 }
 
-async function deleteSportsHistory(sportsHistory, userId) {
-    delete sportsHistory[userId];
-    await writeSportsHistoryToFile(sportsHistory);
+async function deleteChatHistory(chatHistory, userId) {
+    delete chatHistory[userId];
+    await writeChatHistoryToFile(chatHistory);
 }
 
-const sportsLivePlugin = async (m, Matrix) => {
-    const sportsHistory = await readSportsHistoryFromFile();
+const sportsPlugin = async (m, Matrix) => {
+    const chatHistory = await readChatHistoryFromFile();
     const text = m.body.toLowerCase();
 
     if (text === "/forget") {
-        await deleteSportsHistory(sportsHistory, m.sender);
-        await Matrix.sendMessage(m.from, { text: 'Sports conversation deleted successfully.' }, { quoted: m });
+        await deleteChatHistory(chatHistory, m.sender);
+        await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
         return;
     }
 
@@ -61,35 +61,47 @@ const sportsLivePlugin = async (m, Matrix) => {
     const cmd = match ? match[1].toLowerCase() : '';
     const prompt = match ? m.body.slice(match[0].length).trim() : '';
 
-    const validCommands = ['live', 'scores', 'updates'];
+    const validCommands = ['sports', 'team', 'score'];
 
     if (validCommands.includes(cmd)) {
-        try {
-            // API de The Sports DB
-            const sportsApiUrl = `https://www.thesportsdb.com/api/v1/json/${config.SPORTS_API_KEY}/latestsoccerresults.php`;
-            const response = await fetch(sportsApiUrl);
+        if (!prompt) {
+            await Matrix.sendMessage(m.from, { text: 'Please provide a team name.' }, { quoted: m });
+            return;
+        }
 
+        try {
+            await m.React("🤖");
+
+            // Utiliser l'API V1 de The Sports DB pour rechercher des équipes
+            const response = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(prompt)}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            const liveGames = data.latestSoccerResults || []; // Adapté à la structure de The Sports DB
-
-            if (liveGames.length > 0) {
-                let message = '🏅 **Matchs en Direct :**\n';
-                liveGames.forEach(game => {
-                    message += `📅 ${game.date} - ${game.strHomeTeam} vs ${game.strAwayTeam} | Score: ${game.intHomeScore} - ${game.intAwayScore}\n`;
-                });
-                await Matrix.sendMessage(m.from, { text: message }, { quoted: m });
-            } else {
-                await Matrix.sendMessage(m.from, { text: 'Aucun match en direct actuellement.' }, { quoted: m });
+            if (!data.teams || data.teams.length === 0) {
+                await Matrix.sendMessage(m.from, { text: 'No teams found.' }, { quoted: m });
+                return;
             }
+
+            const team = data.teams[0];
+            const teamInfo = `Team Name: ${team.strTeam}\n` +
+                             `Team Badge: ${team.strBadge}\n` +
+                             `Stadium: ${team.strStadium}\n` +
+                             `Description: ${team.strDescriptionEN}`;
+
+            await Matrix.sendMessage(m.from, { text: teamInfo }, { quoted: m });
+            await m.React("✅");
+
+            // Enregistrer l'historique de la conversation
+            await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
+            await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: teamInfo });
         } catch (err) {
             await Matrix.sendMessage(m.from, { text: "An error occurred while processing your request." }, { quoted: m });
             console.error('Error: ', err);
+            await m.React("❌");
         }
     }
 };
 
-export default sportsLivePlugin;
+export default sportsPlugin;
