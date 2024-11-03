@@ -222,7 +222,7 @@ const test = async (m, Matrix) => {
 ╭─────────────━┈⊷
 │🪀 ʙᴏᴛ ɴᴀᴍᴇ: *ALG-MD*
 │🪀 ᴠᴇʀꜱɪᴏɴ: 2.2.3
-│🪀 ᴏᴡɴᴇʀ : *𝐑𝐨𝐦𝐞𝐤*      
+│🪀 ᴏᴡɴᴇʀ : *ALG*      
 │🪀 ɴᴜᴍʙᴇʀ: 919341378016
 │🪀 ᴘʟᴀᴛғᴏʀᴍ: *${os.platform()}*
 │🪀 ᴍᴏᴅᴇ: *${config.MODE}*
@@ -344,7 +344,7 @@ const test = async (m, Matrix) => {
       }
     };
     let { key } = await Matrix.sendMessage(m.from, {
-      image: fs.readFileSync('./src/hitdev2.jpg'),
+      image: fs.readFileSync('./src/hitdev.jpg'),
       caption: str,
       contextInfo: {
         mentionedJid: [m.sender],

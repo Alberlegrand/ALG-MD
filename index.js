@@ -95,8 +95,20 @@ async function start() {
                 }
             } else if (connection === 'open') {
                 if (initialConnection) {
-                    console.log(chalk.green("😃ALG-MD-CONNECTED Successful️✅ JOIN FOR MORE UPDATE🥏 https://whatsapp.com/channel/0029VakaPzeD38CV78dbGf0e"));
-                    Matrix.sendMessage(Matrix.user.id, { text: `😃ALG-MD-CONNECTED Successful️✅ JOIN FOR MORE UPDATE🥏 https://whatsapp.com/channel/0029VakaPzeD38CV78dbGf0e` });
+
+                    // Message de connexion dans la console
+                    console.log(
+                        chalk.greenBright.bold("🌟 ALG-MD-CONNECTED 🌟") +
+                        chalk.white("\nStatus: ") + chalk.green("Successful ✅") +
+                        chalk.cyanBright("\n🎉 JOIN FOR MORE UPDATES 🎉") +
+                        chalk.blue("\n📢 Channel: ") + chalk.underline.blue("https://whatsapp.com/channel/0029VaDAkV9FHWqAMMHvb40b")
+                    );
+                    
+                    // Envoi du message de connexion dans Matrix
+                    Matrix.sendMessage(Matrix.user.id, { 
+                        text: `🌟 ALG-MD-CONNECTED 🌟\nStatus: Successful ✅\n🎉 JOIN FOR MORE UPDATES 🎉\n📢 Channel: https://whatsapp.com/channel/0029VaDAkV9FHWqAMMHvb40b`
+                    });
+                    
                     initialConnection = false;
                 } else {
                     console.log(chalk.blue("♻️ Connection reestablished after restart."));
