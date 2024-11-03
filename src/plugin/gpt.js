@@ -64,7 +64,7 @@ const mistral = async (m, Matrix) => {
     const cmd = match ? match[1].toLowerCase() : '';
     const prompt = match ? m.body.slice(match[0].length).trim() : '';
 
-    const validCommands = ['ai', 'gpt', 'watson'];
+    const validCommands = ['ai', 'gpt', 'alg', 'hitdev', 'dave', 'berny'];
 
     if (validCommands.includes(cmd)) {
         if (!prompt) {
