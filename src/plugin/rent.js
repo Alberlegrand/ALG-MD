@@ -1,88 +1,89 @@
-import { promises as fs } from 'fs';
+import fs from 'fs';
 import path from 'path';
-import config from '../../config.cjs'; // Pour obtenir le préfixe et autres configurations
+import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys';
+import config from '../../config.cjs';
 
-const __filename = new URL(import.meta.url).pathname;
-const __dirname = path.dirname(__filename);
-const registeredUsersFile = path.resolve(__dirname, '../registered_users.json'); // Fichier pour stocker les utilisateurs enregistrés
+const sessions = {};  // Contient les sessions actives
+const sessionDir = path.resolve(__dirname, '../sessions'); // Dossier pour stocker les sessions
 
-// Lecture et écriture de la liste des utilisateurs enregistrés
-async function readRegisteredUsers() {
-    try {
-        const data = await fs.readFile(registeredUsersFile, "utf-8");
-        return JSON.parse(data);
-    } catch (err) {
-        return {};
+// Fonction pour charger une session existante
+async function loadSession(phoneNumber) {
+    const sessionPath = path.join(sessionDir, `${phoneNumber}.json`);
+    if (fs.existsSync(sessionPath)) {
+        return JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
     }
+    return null;
 }
 
-async function writeRegisteredUsers(users) {
-    try {
-        await fs.writeFile(registeredUsersFile, JSON.stringify(users, null, 2));
-    } catch (err) {
-        console.error('Erreur lors de l\'écriture du fichier des utilisateurs enregistrés :', err);
-    }
+// Sauvegarder la session
+function saveSession(phoneNumber, session) {
+    const sessionPath = path.join(sessionDir, `${phoneNumber}.json`);
+    fs.writeFileSync(sessionPath, JSON.stringify(session, null, 2));
 }
 
-async function addUser(user) {
-    const users = await readRegisteredUsers();
-    if (!users[user]) {
-        users[user] = { status: "semi-bot" };
-        await writeRegisteredUsers(users);
-        return `Utilisateur ${user} enregistré comme semi-bot.`;
-    } else {
-        return `Utilisateur ${user} est déjà enregistré.`;
-    }
-}
+// Initialiser une nouvelle session pour un numéro
+async function initializeSession(phoneNumber) {
+    const authState = await useMultiFileAuthState(path.join(sessionDir, phoneNumber));
+    const socket = makeWASocket({ auth: authState.state });
 
-async function handleCommand(m, Matrix) {
-    const users = await readRegisteredUsers();
-    const prefix = config.PREFIX;
-    const text = m.body.toLowerCase();
-
-    const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)`, 'i');
-    const match = m.body.match(commandRegex);
-    const cmd = match ? match[1].toLowerCase() : '';
-    const args = match ? m.body.slice(match[0].length).trim() : '';
-
-    // Vérifier si l'utilisateur est enregistré
-    if (!users[m.sender]) {
-        await Matrix.sendMessage(m.from, { text: "Vous n'êtes pas autorisé à utiliser cette commande." }, { quoted: m });
-        return;
-    }
-
-    // Commandes disponibles pour le semi-bot
-    const validCommands = ['help', 'status', 'info'];
-
-    if (validCommands.includes(cmd)) {
-        switch (cmd) {
-            case 'help':
-                await Matrix.sendMessage(m.from, { text: 'Commandes disponibles : .status, .info' }, { quoted: m });
-                break;
-            case 'status':
-                await Matrix.sendMessage(m.from, { text: `Votre statut : ${users[m.sender].status}` }, { quoted: m });
-                break;
-            case 'info':
-                await Matrix.sendMessage(m.from, { text: "Je suis un assistant semi-bot pour des tâches spécifiques." }, { quoted: m });
-                break;
-            default:
-                await Matrix.sendMessage(m.from, { text: "Commande non reconnue." }, { quoted: m });
+    socket.ev.on('creds.update', () => saveSession(phoneNumber, authState.state.creds));
+    socket.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
+            if (shouldReconnect) initializeSession(phoneNumber);
         }
-    } else if (cmd === 'register' && args) {
-        const response = await addUser(args);
-        await Matrix.sendMessage(m.from, { text: response }, { quoted: m });
+    });
+
+    sessions[phoneNumber] = socket;
+    console.log(`Session initialisée pour ${phoneNumber}`);
+}
+
+// Ajouter un utilisateur en tant que "semi-bot"
+async function addSemiBot(phoneNumber) {
+    if (sessions[phoneNumber]) {
+        return `Le numéro ${phoneNumber} est déjà activé en tant que semi-bot.`;
+    }
+    await initializeSession(phoneNumber);
+    return `Le numéro ${phoneNumber} a été activé en tant que semi-bot.`;
+}
+
+// Fonction pour traiter les messages des "semi-bots"
+async function handleSemiBotCommand(socket, message) {
+    const { from, body } = message;
+    const command = body.split(' ')[0].toLowerCase();
+
+    if (command === '.task') {
+        await socket.sendMessage(from, { text: 'Tâche exécutée par le semi-bot.' });
+    } else if (command === '.status') {
+        await socket.sendMessage(from, { text: 'Je suis un semi-bot en ligne.' });
     } else {
-        await Matrix.sendMessage(m.from, { text: "Commande non autorisée ou non valide." }, { quoted: m });
+        await socket.sendMessage(from, { text: "Commande non reconnue." });
     }
 }
 
+// Plugin principal pour gérer l'ajout de "semi-bots"
 const semiBotPlugin = async (m, Matrix) => {
-    try {
-        await handleCommand(m, Matrix);
-    } catch (err) {
-        await Matrix.sendMessage(m.from, { text: "Erreur lors de l'exécution de la commande." }, { quoted: m });
-        console.error('Erreur dans semiBotPlugin:', err);
+    const text = m.body.toLowerCase();
+    const adminNumber = config.ADMIN_NUMBER;
+
+    if (m.sender === adminNumber) {
+        const [cmd, phoneNumber] = text.split(' ');
+        if (cmd === '.addbot' && phoneNumber) {
+            const response = await addSemiBot(phoneNumber);
+            await Matrix.sendMessage(m.from, { text: response }, { quoted: m });
+            return;
+        }
+    }
+
+    // Si l'utilisateur est un semi-bot, gérer ses commandes
+    if (sessions[m.sender]) {
+        const socket = sessions[m.sender];
+        await handleSemiBotCommand(socket, m);
+    } else {
+        await Matrix.sendMessage(m.from, { text: "Vous n'êtes pas autorisé à utiliser cette commande." }, { quoted: m });
     }
 };
 
+// Exporter le plugin
 export default semiBotPlugin;
