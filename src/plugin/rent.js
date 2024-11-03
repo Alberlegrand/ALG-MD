@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import fetch from 'node-fetch';
-import { generateWAMessageFromContent, proto, makeWASocket, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import config from '../../config.cjs';
 
 const __filename = new URL(import.meta.url).pathname;
@@ -9,76 +9,54 @@ const __dirname = path.dirname(__filename);
 const sessionDir = path.resolve(__dirname, '../sessions');
 const prefix = config.PREFIX || '.';
 
-// Création du répertoire de session s'il n'existe pas
+// Vérifie que le répertoire de sessions existe, sinon le crée
 if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir);
 }
 
-// Initialisation des sessions
+// Objets de sessions pour suivre chaque instance de bot
 const sessions = {};
 
-// Charger une session existante pour un numéro
-async function loadSession(phoneNumber) {
-    const sessionPath = path.join(sessionDir, `${phoneNumber}.json`);
-    try {
-        const authState = await useMultiFileAuthState(sessionPath);
-        return authState;
-    } catch (err) {
-        console.error(`Erreur de chargement de session pour ${phoneNumber}:`, err);
-        return null;
-    }
-}
-
-// Sauvegarder une session dans un fichier
-async function saveSession(phoneNumber, authState) {
-    const sessionPath = path.join(sessionDir, `${phoneNumber}.json`);
-    try {
-        await fs.writeFile(sessionPath, JSON.stringify(authState.creds, null, 2));
-    } catch (err) {
-        console.error(`Erreur de sauvegarde de session pour ${phoneNumber}:`, err);
-    }
-}
-
-// Initialiser une session pour un numéro spécifique
+// Fonction pour initialiser une session pour un numéro donné
 async function initializeSession(phoneNumber) {
-    const authState = await loadSession(phoneNumber);
-    if (!authState) {
-        console.error(`Session pour ${phoneNumber} non trouvée`);
-        return null;
-    }
+    const sessionPath = path.join(sessionDir, `${phoneNumber}`);
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    
+    const socket = makeWASocket({ auth: state });
 
-    const socket = makeWASocket({ auth: authState.state });
+    // Écoute des événements de mise à jour des credentials et sauvegarde
+    socket.ev.on('creds.update', saveCreds);
 
-    socket.ev.on('creds.update', async () => {
-        await saveSession(phoneNumber, authState.state);
-    });
-
+    // Gestion des événements de connexion
     socket.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== 401;
-            if (shouldReconnect) initializeSession(phoneNumber);
+            if (shouldReconnect) await initializeSession(phoneNumber);
         }
     });
 
+    // Enregistrement de la session dans l'objet de sessions
     sessions[phoneNumber] = socket;
     return socket;
 }
 
-// Commande pour ajouter un nouveau semi-bot
+// Fonction pour ajouter un semi-bot
 async function addSemiBot(phoneNumber) {
     if (sessions[phoneNumber]) {
         return `Le numéro ${phoneNumber} est déjà activé en tant que semi-bot.`;
     }
-
-    const socket = await initializeSession(phoneNumber);
-    if (!socket) {
+    
+    try {
+        const socket = await initializeSession(phoneNumber);
+        return `Le numéro ${phoneNumber} est activé en tant que semi-bot.`;
+    } catch (error) {
+        console.error(`Erreur lors de l'initialisation du semi-bot pour ${phoneNumber}:`, error);
         return `Échec de l'activation du semi-bot pour le numéro ${phoneNumber}.`;
     }
-    return `Le numéro ${phoneNumber} est activé en tant que semi-bot.`;
 }
 
-// Commande du semi-bot pour gérer les actions avec le préfixe
+// Gestion des commandes pour un semi-bot spécifique
 async function handleSemiBotCommand(socket, m) {
     const { from, body } = m;
     const [cmd, ...args] = body.trim().split(' ');
@@ -105,12 +83,13 @@ async function handleSemiBotCommand(socket, m) {
     }
 }
 
-// Plugin principal pour l'ajout de semi-bots et les commandes
+// Plugin principal pour la gestion des semi-bots et des commandes
 const semiBotPlugin = async (m, Matrix) => {
     const text = m.body.toLowerCase();
     const adminNumber = config.ADMIN_NUMBER;
     const [cmd, phoneNumber] = text.split(' ');
 
+    // Commande pour ajouter un nouveau semi-bot (par l'admin uniquement)
     if (m.sender === adminNumber && cmd === `${prefix}addbot` && phoneNumber) {
         try {
             const response = await addSemiBot(phoneNumber);
@@ -122,6 +101,7 @@ const semiBotPlugin = async (m, Matrix) => {
         return;
     }
 
+    // Vérifie si le message est envoyé par un semi-bot et gère les commandes spécifiques
     if (sessions[m.sender]) {
         const socket = sessions[m.sender];
         await handleSemiBotCommand(socket, m);
