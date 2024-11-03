@@ -37,8 +37,18 @@ const Handler = async (chatUpdate, sock, logger) => {
         const isCOMMAND = (body) => PREFIX.test(body);
         const prefixMatch = isCOMMAND(m.body) ? m.body.match(PREFIX) : null;
         const prefix = prefixMatch ? prefixMatch[0] : '/';
-        const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-        const text = m.body.slice(prefix.length + cmd.length).trim();
+
+        // Utilisation d'une regex pour capturer commande et arguments
+        const commandRegex = new RegExp(`^(${prefix})(\\w+)(.*)$`); // Match le préfixe, commande, et tout ce qui suit
+        const match = commandRegex.exec(m.body.trim());
+
+        let cmd = '';
+        let text = '';
+
+        if (match) {
+            cmd = match[2].toLowerCase(); // La commande
+            text = match[3].trim(); // Les arguments
+        }
 
         if (m.key && m.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
             await sock.readMessages([m.key]);
@@ -71,13 +81,13 @@ const Handler = async (chatUpdate, sock, logger) => {
         for (const file of pluginFiles) {
             if (file.endsWith('.js')) {
                 const pluginPath = path.join(pluginDir, file);
-               // console.log(`Attempting to load plugin: ${pluginPath}`);
+                // console.log(`Attempting to load plugin: ${pluginPath}`);
 
                 try {
                     const pluginModule = await import(`file://${pluginPath}`);
                     const loadPlugins = pluginModule.default;
                     await loadPlugins(m, sock);
-                   // console.log(`Successfully loaded plugin: ${pluginPath}`);
+                    // console.log(`Successfully loaded plugin: ${pluginPath}`);
                 } catch (err) {
                     console.error(`Failed to load plugin: ${pluginPath}`, err);
                 }
