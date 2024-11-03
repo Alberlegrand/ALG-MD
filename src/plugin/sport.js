@@ -1,106 +1,96 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import fetch from 'node-fetch';
-import pkg from '@whiskeysockets/baileys';
-const { generateWAMessageFromContent, proto } = pkg;
-import config from '../../config.cjs';
-
-const __filename = new URL(import.meta.url).pathname;
-const __dirname = path.dirname(__filename);
-const chatHistoryFile = path.resolve(__dirname, '../ai_chat_history.json');
-
-const aiSystemPrompt = "You are a helpful assistant for sports inquiries.";
-
-async function readChatHistoryFromFile() {
-    try {
-        const data = await fs.readFile(chatHistoryFile, "utf-8");
-        return JSON.parse(data);
-    } catch (err) {
-        return {};
-    }
-}
-
-async function writeChatHistoryToFile(chatHistory) {
-    try {
-        await fs.writeFile(chatHistoryFile, JSON.stringify(chatHistory, null, 2));
-    } catch (err) {
-        console.error('Error writing chat history to file:', err);
-    }
-}
-
-async function updateChatHistory(chatHistory, sender, message) {
-    if (!chatHistory[sender]) {
-        chatHistory[sender] = [];
-    }
-    chatHistory[sender].push(message);
-    if (chatHistory[sender].length > 20) {
-        chatHistory[sender].shift();
-    }
-    await writeChatHistoryToFile(chatHistory);
-}
-
-async function deleteChatHistory(chatHistory, userId) {
-    delete chatHistory[userId];
-    await writeChatHistoryToFile(chatHistory);
-}
+const fetch = require('node-fetch');
 
 const sportsPlugin = async (m, Matrix) => {
-    const chatHistory = await readChatHistoryFromFile();
     const text = m.body.toLowerCase();
 
-    if (text === "/forget") {
-        await deleteChatHistory(chatHistory, m.sender);
-        await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
-        return;
+    // Commande pour chercher le badge d'une équipe
+    if (text.startsWith("/team ")) {
+        const teamName = text.replace("/team ", "").trim();
+        try {
+            await m.React("🔍");
+            const response = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(teamName)}`);
+            const data = await response.json();
+
+            if (!data.teams || data.teams.length === 0) {
+                await Matrix.sendMessage(m.from, { text: `No team found with the name "${teamName}".` }, { quoted: m });
+            } else {
+                const team = data.teams[0];
+                const badge = team.strBadge ? team.strBadge : "No badge available.";
+                await Matrix.sendMessage(m.from, { 
+                    text: `Team: ${team.strTeam}\nLeague: ${team.strLeague}\nBadge: ${badge}` 
+                }, { quoted: m });
+                await m.React("✅");
+            }
+        } catch (error) {
+            console.error("Error fetching team data:", error);
+            await Matrix.sendMessage(m.from, { text: "An error occurred while fetching team information." }, { quoted: m });
+            await m.React("❌");
+        }
     }
 
-    const prefix = config.PREFIX;
-    const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)`, 'i');
-    const match = m.body.match(commandRegex);
-
-    const cmd = match ? match[1].toLowerCase() : '';
-    const prompt = match ? m.body.slice(match[0].length).trim() : '';
-
-    const validCommands = ['sports', 'team', 'score'];
-
-    if (validCommands.includes(cmd)) {
-        if (!prompt) {
-            await Matrix.sendMessage(m.from, { text: 'Please provide a team name.' }, { quoted: m });
-            return;
-        }
-
+    // Commande pour obtenir les scores en direct
+    else if (text === "/livescore") {
         try {
-            await m.React("🤖");
-
-            // Utiliser l'API V1 de The Sports DB pour rechercher des équipes
-            const response = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(prompt)}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            await m.React("📺");
+            const response = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsnow.php`);
             const data = await response.json();
-            if (!data.teams || data.teams.length === 0) {
-                await Matrix.sendMessage(m.from, { text: 'No teams found.' }, { quoted: m });
+
+            if (!data.events || data.events.length === 0) {
+                await Matrix.sendMessage(m.from, { text: 'No live scores available right now.' }, { quoted: m });
+            } else {
+                let scoreMessage = 'Live Scores:\n\n';
+                data.events.forEach(event => {
+                    scoreMessage += `Match: ${event.strEvent}\nDate: ${event.dateEvent}\nScore: ${event.intHomeScore} - ${event.intAwayScore}\n\n`;
+                });
+
+                await Matrix.sendMessage(m.from, { text: scoreMessage }, { quoted: m });
+                await m.React("✅");
+            }
+        } catch (error) {
+            console.error("Error fetching live scores:", error);
+            await Matrix.sendMessage(m.from, { text: "An error occurred while fetching live scores." }, { quoted: m });
+            await m.React("❌");
+        }
+    }
+
+    // Commande pour les événements passés d'une équipe
+    else if (text.startsWith("/events ")) {
+        const teamName = text.replace("/events ", "").trim();
+        try {
+            await m.React("📅");
+            const searchResponse = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(teamName)}`);
+            const searchData = await searchResponse.json();
+
+            if (!searchData.teams || searchData.teams.length === 0) {
+                await Matrix.sendMessage(m.from, { text: `No team found with the name "${teamName}".` }, { quoted: m });
                 return;
             }
 
-            const team = data.teams[0];
-            const teamInfo = `Team Name: ${team.strTeam}\n` +
-                             `Team Badge: ${team.strBadge}\n` +
-                             `Stadium: ${team.strStadium}\n` +
-                             `Description: ${team.strDescriptionEN}`;
+            const teamID = searchData.teams[0].idTeam;
+            const eventsResponse = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=${teamID}`);
+            const eventsData = await eventsResponse.json();
 
-            await Matrix.sendMessage(m.from, { text: teamInfo }, { quoted: m });
-            await m.React("✅");
+            if (!eventsData.results || eventsData.results.length === 0) {
+                await Matrix.sendMessage(m.from, { text: `No recent events found for team "${teamName}".` }, { quoted: m });
+            } else {
+                let eventsMessage = `Recent Events for ${teamName}:\n\n`;
+                eventsData.results.forEach(event => {
+                    eventsMessage += `Match: ${event.strEvent}\nDate: ${event.dateEvent}\nScore: ${event.intHomeScore} - ${event.intAwayScore}\n\n`;
+                });
 
-            // Enregistrer l'historique de la conversation
-            await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
-            await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: teamInfo });
-        } catch (err) {
-            await Matrix.sendMessage(m.from, { text: "An error occurred while processing your request." }, { quoted: m });
-            console.error('Error: ', err);
+                await Matrix.sendMessage(m.from, { text: eventsMessage }, { quoted: m });
+                await m.React("✅");
+            }
+        } catch (error) {
+            console.error("Error fetching recent events:", error);
+            await Matrix.sendMessage(m.from, { text: "An error occurred while fetching recent events." }, { quoted: m });
             await m.React("❌");
         }
+    }
+
+    // Message par défaut si la commande est inconnue
+    else {
+        await Matrix.sendMessage(m.from, { text: "Unknown command. Please use:\n/team <team name>\n/livescore\n/events <team name>" }, { quoted: m });
     }
 };
 
