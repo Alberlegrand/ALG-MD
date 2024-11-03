@@ -5,7 +5,6 @@ import pkg from '@whiskeysockets/baileys';
 const { generateWAMessageFromContent, proto } = pkg;
 import config from '../../config.cjs';
 
-
 const __filename = new URL(import.meta.url).pathname;
 const __dirname = path.dirname(__filename);
 const chatHistoryFile = path.resolve(__dirname, '../mistral_history.json');
@@ -56,8 +55,14 @@ const mistral = async (m, Matrix) => {
     }
 
     const prefix = config.PREFIX;
-const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-const prompt = m.body.slice(prefix.length + cmd.length).trim();
+
+    // Utiliser une expression régulière pour capturer la commande après le préfixe
+    const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)`, 'i'); // Capture le premier mot après le préfixe
+    const match = m.body.match(commandRegex);
+
+    // Vérifiez si une correspondance a été trouvée
+    const cmd = match ? match[1].toLowerCase() : '';
+    const prompt = match ? m.body.slice(match[0].length).trim() : '';
 
     const validCommands = ['ai', 'gpt', 'watson'];
 
@@ -104,7 +109,7 @@ const prompt = m.body.slice(prefix.length + cmd.length).trim();
 
             if (codeMatch) {
                 const code = codeMatch[1];
-                
+
                 let msg = generateWAMessageFromContent(m.from, {
                     viewOnceMessage: {
                         message: {
