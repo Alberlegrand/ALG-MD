@@ -1,53 +1,92 @@
-const { smd, prefix, Config, sleep } = require('../lib'); // Importation des modules nécessaires
+import { promises as fs } from 'fs';
+import path from 'path';
+import config from '../../config.cjs';
+import { sleep } from '../lib';
+import pkg from '@whiskeysockets/baileys';
 
-// Enregistrement du plugin via 'smd'
-smd({
-    cmdname: "hack",
-    type: "fun",
-    info: "Simule un piratage pour plaisanter.",
-    filename: __filename,
-}, async (citel) => {
+const { generateWAMessageFromContent, proto } = pkg;
+const __filename = new URL(import.meta.url).pathname;
+const __dirname = path.dirname(__filename);
+const hackProgressFile = path.resolve(__dirname, '../hack_progress.json');
+
+// Fonction pour lire l'état de progression de piratage
+async function readHackProgress() {
     try {
-        // Début de la simulation de piratage
-        await citel.send("Injecting Malware...");
-        await sleep(2000);
+        const data = await fs.readFile(hackProgressFile, 'utf-8');
+        return JSON.parse(data);
+    } catch (err) {
+        return {}; // retourne un objet vide si le fichier n'existe pas encore
+    }
+}
 
-        // Progression de la barre de piratage
-        const progressSteps = [
-            { text: " █ 10%", delay: 1000 },
-            { text: " █ █ 20%", delay: 1000 },
-            { text: " █ █ █ 30%", delay: 1000 },
-            { text: " █ █ █ █ 40%", delay: 1000 },
-            { text: " █ █ █ █ █ 50%", delay: 1000 },
-            { text: " █ █ █ █ █ █ 60%", delay: 1000 },
-            { text: " █ █ █ █ █ █ █ 70%", delay: 1000 },
-            { text: " █ █ █ █ █ █ █ █ 80%", delay: 1000 },
-            { text: " █ █ █ █ █ █ █ █ █ 90%", delay: 1000 },
-            { text: " █ █ █ █ █ █ █ █ █ █ 100%", delay: 1000 }
+// Fonction pour écrire la progression de piratage
+async function writeHackProgress(progress) {
+    try {
+        await fs.writeFile(hackProgressFile, JSON.stringify(progress, null, 2));
+    } catch (err) {
+        console.error('Erreur d\'écriture du fichier de progression:', err);
+    }
+}
+
+// Fonction pour mettre à jour la progression de piratage
+async function updateHackProgress(progress, sender, stage) {
+    if (!progress[sender]) {
+        progress[sender] = [];
+    }
+    progress[sender].push(stage);
+    if (progress[sender].length > 10) {
+        progress[sender].shift();
+    }
+    await writeHackProgress(progress);
+}
+
+// Fonction principale pour le plugin de piratage
+const hackPlugin = async (m, Matrix) => {
+    const progress = await readHackProgress();
+    const text = m.body.toLowerCase();
+
+    const prefix = config.PREFIX;
+    const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)`, 'i');
+    const match = m.body.match(commandRegex);
+
+    const cmd = match ? match[1].toLowerCase() : '';
+    const prompt = match ? m.body.slice(match[0].length).trim() : '';
+
+    // On vérifie que la commande est bien "hack"
+    if (cmd === 'hack') {
+        await m.React("💻");
+
+        // Initialisation de l'animation de piratage
+        const hackSteps = [
+            "Injecting Malware...",
+            " █ 10%", " █ █ 20%", " █ █ █ 30%", " █ █ █ █ 40%", " █ █ █ █ █ 50%",
+            " █ █ █ █ █ █ 60%", " █ █ █ █ █ █ █ 70%", " █ █ █ █ █ █ █ █ 80%",
+            " █ █ █ █ █ █ █ █ █ 90%", " █ █ █ █ █ █ █ █ █ █ 100%",
+            "System hijacking in progress...",
+            "Connecting to server: error 404 not found.",
+            "Device successfully connected... Receiving data...",
+            "Data hijacked from device: 100% completed.",
+            "Erasing all evidence and cleaning up malware...",
+            "HACKING COMPLETED",
+            "SENDING LOG DOCUMENTS...",
+            "SUCCESSFULLY SENT DATA AND DISCONNECTED."
         ];
 
-        for (const step of progressSteps) {
-            await citel.send(step.text);
-            await sleep(step.delay);
+        try {
+            for (const step of hackSteps) {
+                await Matrix.sendMessage(m.from, { text: step }, { quoted: m });
+                await updateHackProgress(progress, m.sender, step); // Enregistre chaque étape
+                await sleep(1000);
+            }
+
+            await Matrix.sendMessage(m.from, { text: 'BACKLOGS CLEARED' }, { quoted: m });
+            await m.React("✅");
+        } catch (err) {
+            await Matrix.sendMessage(m.from, { text: "Erreur lors de la simulation de piratage." }, { quoted: m });
+            console.error('Erreur:', err);
+            await m.React("❌");
         }
-
-        // Finalisation de la simulation
-        await citel.send("System hijacking in progress... \nConnecting to server: error 404 not found.");
-        await sleep(1000);
-        await citel.send("Device successfully connected... \nReceiving data...");
-        await sleep(1000);
-        await citel.send("Data hijacked from device: 100% completed.\nErasing all evidence and cleaning up malware...");
-        await sleep(1000);
-        await citel.send("HACKING COMPLETED");
-        await sleep(2000);
-        await citel.send("SENDING LOG DOCUMENTS...");
-        await sleep(1000);
-        await citel.send("SUCCESSFULLY SENT DATA AND DISCONNECTED.");
-        await sleep(1000);
-
-        return await citel.send('BACKLOGS CLEARED');
-    } catch (error) {
-        console.error("Erreur dans le plugin hack.js:", error);
-        await citel.send("Erreur: Impossible de compléter la simulation de piratage.");
     }
-});
+};
+
+export default hackPlugin;
