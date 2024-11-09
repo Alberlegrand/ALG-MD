@@ -71,7 +71,7 @@ _________________________________________
               text: uptimeMessage
             }),
             footer: proto.Message.InteractiveMessage.Footer.create({
-              text: "© ᴘᴏᴡᴇʀᴅ ʙʏ ALG-mᴅ-ʙᴏᴛ"
+              text: "© ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴀʟɢ-ᴍᴅ"
             }),
             header: proto.Message.InteractiveMessage.Header.create({
               ...(await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer })),
