@@ -10,22 +10,22 @@ const { generateWAMessageFromContent, proto } = pkg;
 const PREFIX = config.PREFIX;
 const MODE = config.MODE === 'public' ? 'public' : 'private';
 
+// Utilisation d'une fonction pour l'envoi d'erreurs
+async function sendErrorMessage(Matrix, m, error) {
+  const errorMsg = `❌ Une erreur s'est produite : ${error.message}`;
+  await Matrix.sendMessage(m.from, { text: errorMsg });
+}
+
 // 2. Memory and Uptime Information
-const totalMemoryBytes = os.totalmem();
-const freeMemoryBytes = os.freemem();
-
-const byteToKB = 1 / 1024;
-const byteToMB = byteToKB / 1024;
-const byteToGB = byteToMB / 1024;
-
 function formatBytes(bytes) {
   try {
-    if (bytes >= Math.pow(1024, 3)) return (bytes * byteToGB).toFixed(2) + ' GB';
-    if (bytes >= Math.pow(1024, 2)) return (bytes * byteToMB).toFixed(2) + ' MB';
-    if (bytes >= 1024) return (bytes * byteToKB).toFixed(2) + ' KB';
-    return bytes.toFixed(2) + ' bytes';
+    if (bytes >= Math.pow(1024, 3)) return (bytes / Math.pow(1024, 3)).toFixed(2) + ' GB';
+    if (bytes >= Math.pow(1024, 2)) return (bytes / Math.pow(1024, 2)).toFixed(2) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return bytes + ' bytes';
   } catch (error) {
-    await Matrix.sendMessage(m.from, 'Erreur dans le formatage de la mémoire.', { quoted: m });
+    console.error('Erreur dans formatBytes:', error);
+    throw error; // Relancer pour capturer dans le bloc appelant
   }
 }
 
@@ -36,13 +36,13 @@ function getUptimeMessage() {
     const hours = Math.floor((uptime % (24 * 3600)) / 3600);
     const minutes = Math.floor((uptime % 3600) / 60);
     const seconds = Math.floor(uptime % 60);
-
     return {
       text: `*I am alive now since ${day}d ${hours}h ${minutes}m ${seconds}s*`,
       detailed: `*☀️ ${day} Day*\n*🕐 ${hours} Hour*\n*⏰ ${minutes} Minutes*\n*⏱️ ${seconds} Seconds*\n`
     };
   } catch (error) {
-    await Matrix.sendMessage(m.from, 'Erreur dans le calcul de l\'uptime du bot.', { quoted: m });
+    console.error('Erreur dans getUptimeMessage:', error);
+    throw error;
   }
 }
 
@@ -55,12 +55,15 @@ function getGreeting() {
     if (timeNow < "18:00:00") return "Good Evening 🌃";
     return "Good Night 🌌";
   } catch (error) {
-    await Matrix.sendMessage(m.from, 'Erreur dans la génération du message de bienvenue.', { quoted: m });
+    console.error('Erreur dans getGreeting:', error);
+    throw error;
   }
 }
 
+// 3. Main Function
 const test = async (m, Matrix) => {
   try {
+    // Initialisation des paramètres
     let selectedListId;
     const selectedButtonId = m?.message?.templateButtonReplyMessage?.selectedId;
     const interactiveResponseMessage = m?.message?.interactiveResponseMessage;
@@ -68,30 +71,27 @@ const test = async (m, Matrix) => {
     if (interactiveResponseMessage) {
       const paramsJson = interactiveResponseMessage.nativeFlowResponseMessage?.paramsJson;
       if (paramsJson) {
-        try {
-          const params = JSON.parse(paramsJson);
-          selectedListId = params.id;
-        } catch (error) {
-          await Matrix.sendMessage(m.from, 'Erreur de parsing des paramètres.', { quoted: m });
-        }
+        selectedListId = JSON.parse(paramsJson).id;
       }
     }
 
     const selectedId = selectedListId || selectedButtonId;
+
+    // Extraction de la commande
     const match = m.body.match(new RegExp(`^${PREFIX}\\s*(\\w+)`, 'i'));
     const cmd = match ? match[1].toLowerCase() : '';
 
+    // Commandes valides
     const validCommands = ['list', 'help', 'menu'];
 
     if (validCommands.includes(cmd)) {
-      try {
-        const uptimeMsg = getUptimeMessage();
-        const msgContent = generateWAMessageFromContent(m.from, {
-          viewOnceMessage: {
-            message: {
-              interactiveMessage: proto.Message.InteractiveMessage.create({
-                body: proto.Message.InteractiveMessage.Body.create({
-                  text: `╭─────────────━┈⊷
+      const uptimeMsg = getUptimeMessage();
+      const msgContent = await generateWAMessageFromContent(m.from, {
+        viewOnceMessage: {
+          message: {
+            interactiveMessage: proto.Message.InteractiveMessage.create({
+              body: proto.Message.InteractiveMessage.Body.create({
+                text: `╭─────────────━┈⊷
 │🪀 ʙᴏᴛ ɴᴀᴍᴇ: *ALG-MD* 
 │🪀 ᴠᴇʀꜱɪᴏɴ: 2.2.0
 │🪀 ᴏᴡɴᴇʀ : *ALG-MD*      
@@ -100,48 +100,31 @@ const test = async (m, Matrix) => {
 │🪀 ᴍᴏᴅᴇ: *${MODE}*
 │🪀 ᴘʀᴇғɪx: [${PREFIX}]
 ╰─────────────━┈⊷`
-                }),
-                footer: proto.Message.InteractiveMessage.Footer.create({
-                  text: "©POWERED BY 𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫"
-                }),
-                header: proto.Message.InteractiveMessage.Header.create({
-                  textMessage: proto.Message.TextMessage.create({
-                    text: "Bienvenue sur ALG-MD",
-                  }),
-                }),
-                contextInfo: { quotedMessage: m.message, mentionedJid: [m.sender] }
               }),
-            },
+              footer: proto.Message.InteractiveMessage.Footer.create({
+                text: "©POWERED BY 𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫"
+              }),
+              header: proto.Message.InteractiveMessage.Header.create({
+                ...(await prepareWAMessageMedia({ image: fs.readFileSync('./src/hitdev.jpg') }, { upload: Matrix.waUploadToServer }))
+              }),
+              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: [
+                  { name: "quick_reply", buttonParamsJson: JSON.stringify({ display_text: "ALIVE", id: `${PREFIX}alive` }) },
+                  { name: "quick_reply", buttonParamsJson: JSON.stringify({ display_text: "PING", id: `${PREFIX}ping` }) },
+                ]
+              }),
+              contextInfo: { quotedMessage: m.message, mentionedJid: [m.sender] }
+            }),
           },
-        }, {});
+        },
+      }, {});
 
-        await Matrix.relayMessage(msgContent.key.remoteJid, msgContent.message, { messageId: msgContent.key.id });
-      } catch (error) {
-        await Matrix.sendMessage(m.from, 'Erreur lors de l\'envoi du message interactif.', { quoted: m });
-      }
+      await Matrix.relayMessage(msgContent.key.remoteJid, msgContent.message, { messageId: msgContent.key.id });
     }
 
-    if (selectedId === "View All Menu") {
-      const greeting = getGreeting();
-      const response = `hey ${m.pushName} ${greeting}
-╭─────────────━┈⊷
-│🪀 ʙᴏᴛ ɴᴀᴍᴇ: *ALG-MD*
-│🪀 ᴠᴇʀꜱɪᴏɴ: 2.2.3
-│🪀 ᴏᴡɴᴇʀ : *ALG*      
-│🪀 ᴘʟᴀᴛғᴏʀᴍ: *${os.platform()}*
-│🪀 ᴍᴏᴅᴇ: *${config.MODE}*
-│🪀 ᴘʀᴇғɪx: [${PREFIX}]
-╰─────────────━┈⊷ 
-╭━❮ 𝙲𝙾𝙽𝚅𝙴𝚁𝚃𝙴𝚁 ❯━╮
-✰ ${PREFIX}ATTP
-✰ ${PREFIX}ATTP2
-✰ ${PREFIX}ATTP3
-...
-╰━━━━━━━━━━━━━━━⪼`;
-      await Matrix.sendMessage(m.from, response, { quoted: m });
-    }
   } catch (error) {
-    await Matrix.sendMessage(m.from, 'Erreur inattendue dans la fonction principale.', { quoted: m });
+    // Envoi de l'erreur sur WhatsApp
+    await sendErrorMessage(Matrix, m, error);
   }
 };
 
