@@ -33,7 +33,7 @@ function getUptimeMessage() {
   const hours = Math.floor((uptime % (24 * 3600)) / 3600);
   const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = Math.floor(uptime % 60);
-  
+
   return {
     text: `*I am alive now since ${day}d ${hours}h ${minutes}m ${seconds}s*`,
     detailed: `*☀️ ${day} Day*\n*🕐 ${hours} Hour*\n*⏰ ${minutes} Minutes*\n*⏱️ ${seconds} Seconds*\n`
@@ -66,10 +66,15 @@ const test = async (m, Matrix) => {
   }
 
   const selectedId = selectedListId || selectedButtonId;
-  const cmd = m.body.startsWith(PREFIX) ? m.body.slice(PREFIX.length).split(' ')[0].toLowerCase() : '';
+
+  // Utilisation de regex pour extraire la commande sans les espaces superflus
+  const match = m.body.match(new RegExp(`^${PREFIX}\\s*(\\w+)`, 'i'));
+  const cmd = match ? match[1].toLowerCase() : '';
+
+  // Commandes valides
   const validCommands = ['list', 'help', 'menu'];
 
-  // Handle valid commands
+  // Gestion des commandes valides
   if (validCommands.includes(cmd)) {
     const uptimeMsg = getUptimeMessage();
     const msgContent = generateWAMessageFromContent(m.from, {
@@ -109,7 +114,7 @@ const test = async (m, Matrix) => {
     await Matrix.relayMessage(msgContent.key.remoteJid, msgContent.message, { messageId: msgContent.key.id });
   }
 
-  // Respond based on selected item
+  // Réponse basée sur l'élément sélectionné
   if (selectedId === "View All Menu") {
     const greeting = getGreeting();
     const response = `hey ${m.pushName} ${greeting}
