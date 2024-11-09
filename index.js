@@ -172,27 +172,11 @@ async function start() {
 
 
 Matrix.ev.on('messages.upsert', async (update) => {
-    const msg = update.messages[0];
-
-    // Vérifie si le message est bien un statut
-    if (msg.key.remoteJid === 'status@broadcast' && msg.key.fromMe === false) {
-        try {
-            // Identifiant de l'utilisateur pour s'assurer que la réaction est envoyée à partir du bot
-            const botId = sock.user.id;
-
-            // Réaction au statut avec un cœur vert
-            await Matrix.sendMessage(msg.key.remoteJid, {
-                react: {
-                    key: msg.key,
-                    text: '💚' // Emoji de réaction
-                }
-            }, { statusJidList: [msg.key.participant, botId] });
-            
-            console.log('Réaction envoyée avec succès!');
-        } catch (error) {
-            console.error('Erreur lors de l\'envoi de la réaction :', error);
-        }
-    }
+const msg = update.messages[0];
+if (msg.key.remoteJid === 'status@broadcast') {
+const me = await  Matrix.user.id
+await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '💚'}}, { statusJidList: [msg.key.participant, me] });
+}
 });
 
 
