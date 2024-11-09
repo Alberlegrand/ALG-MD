@@ -2,18 +2,21 @@ import config from '../../config.cjs';
 
 const ping = async (m, sock) => {
   const prefix = config.PREFIX;
-const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-const text = m.body.slice(prefix.length + cmd.length).trim();
+  
+  // Utilisation d'une regex pour extraire la commande même avec des espaces en trop
+  const match = m.body.match(new RegExp(`^${prefix}\\s*(\\w+)`, 'i'));
+  const cmd = match ? match[1].toLowerCase() : '';
 
+  // Si la commande est "ping", on continue
   if (cmd === "ping") {
-    const start = new Date().getTime();
+    const start = Date.now();
     await m.React('⤵️');
-    const end = new Date().getTime();
+    const end = Date.now();
     const responseTime = (end - start) / 1000;
 
-    const text = `*🧿Ping ALG-MD🪀: ${responseTime.toFixed(2)} ms*`;
-    sock.sendMessage(m.from, { text }, { quoted: m });
+    const text = `*🧿 Ping ALG-MD 🪀: ${responseTime.toFixed(2)} ms*`;
+    await sock.sendMessage(m.from, { text }, { quoted: m });
   }
-}
+};
 
 export default ping;
