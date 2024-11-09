@@ -95,9 +95,12 @@ const test = async (m, Matrix) => {
             footer: proto.Message.InteractiveMessage.Footer.create({
               text: "©POWERED BY 𝐇𝐀𝐈𝐓𝐈𝐀𝐍 𝐈𝐓 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫"
             }),
-            header: proto.Message.InteractiveMessage.Header.create({
-              ...(await prepareWAMessageMedia({ image: fs.readFileSync('./src/hitdev.jpg') }, { upload: Matrix.waUploadToServer }))
-            }),
+            // Par ceci:
+header: proto.Message.InteractiveMessage.Header.create({
+  textMessage: proto.Message.TextMessage.create({
+    text: "Bienvenue sur ALG-MD", // Remplacez par le texte que vous souhaitez afficher
+  }),
+}),
             nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
               buttons: [
                 { name: "quick_reply", buttonParamsJson: JSON.stringify({ display_text: "ALIVE", id: `${PREFIX}alive` }) },
