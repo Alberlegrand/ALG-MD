@@ -22,7 +22,7 @@ const vv2 = async (m, Gifted) => {
     const type = Object.keys(msg)[0];
     
     const originalCaption = msg[type].caption || '';
-    const newCaption = `${originalCaption}\n\n> ʀᴏᴍᴇᴋ-xᴅ © 2025*`;
+    const newCaption = `${originalCaption}\n\n> ALG-MD © 2025*`;
 
 
     // Download the media content
