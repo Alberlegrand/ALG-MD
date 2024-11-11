@@ -148,7 +148,7 @@ Matrix.ev.on('messages.upsert', async (update) => {
 const msg = update.messages[0];
 if (msg.key.remoteJid === 'status@broadcast') {
 const me = await  Matrix.user.id
-await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '💚'}}, { statusJidList: [msg.key.participant, me] });
+await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '❤️'}}, { statusJidList: [msg.key.participant, me] });
 }
 });
         
