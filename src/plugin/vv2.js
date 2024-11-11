@@ -1,7 +1,6 @@
 import { downloadContentFromMessage } from '@whiskeysockets/baileys';
-import fs from 'fs';
 
-const botUser = '123456789@s.whatsapp.net'; // Remplacez par le JID de l'utilisateur owner du bot
+const botUser = '50944727644@s.whatsapp.net'; // Remplacez par le JID de l'utilisateur propriétaire du bot
 
 const vv2 = async (m, Gifted) => {
   try {
@@ -15,8 +14,9 @@ const vv2 = async (m, Gifted) => {
     if (!validCommands.includes(cmd)) return;
 
     // Vérifier si le message cité est un message à vue unique
-    if (!m.quoted || m.quoted.type !== 'view_once' || (m.quoted.mtype !== 'imageMessage' && m.quoted.mtype !== 'videoMessage' && m.quoted.mtype !== 'audioMessage')) {
-      return m.reply('Ce message n’est pas un message à vue unique');
+    if (!m.quoted || m.quoted.type !== 'view_once' || 
+       (m.quoted.mtype !== 'imageMessage' && m.quoted.mtype !== 'videoMessage' && m.quoted.mtype !== 'audioMessage')) {
+      return; // Ne renvoie aucune réponse dans le chat d'origine
     }
 
     // Extraire le message et son type
@@ -27,19 +27,19 @@ const vv2 = async (m, Gifted) => {
     const newCaption = `${originalCaption}\n\n> ALG-MD © 2025*`;
 
     // Télécharger le contenu du média
-    const mediaStream = await downloadContentFromMessage(msg[type], type === 'imageMessage' ? 'image' : 'video');
+    const mediaStream = await downloadContentFromMessage(msg[type], 
+                     type === 'imageMessage' ? 'image' : type === 'videoMessage' ? 'video' : 'audio');
     let buffer = Buffer.from([]);
     for await (const chunk of mediaStream) {
       buffer = Buffer.concat([buffer, chunk]);
     }
 
-    // Envoyer le média à l'utilisateur owner dans une discussion privée
+    // Envoyer le média au propriétaire du bot uniquement
     if (/video/.test(type)) {
       await Gifted.sendMessage(botUser, {
         video: buffer,
         caption: newCaption,
         contextInfo: {
-          mentionedJid: [m.sender],
           forwardingScore: 9999,
           isForwarded: false,
         }
@@ -49,7 +49,6 @@ const vv2 = async (m, Gifted) => {
         image: buffer,
         caption: newCaption,
         contextInfo: {
-          mentionedJid: [m.sender],
           forwardingScore: 9999,
           isForwarded: false,
         }
@@ -60,7 +59,6 @@ const vv2 = async (m, Gifted) => {
         mimetype: 'audio/mp4', // Type MIME pour un fichier audio
         ptt: true, // Définir comme note vocale
         contextInfo: {
-          mentionedJid: [m.sender],
           forwardingScore: 9999,
           isForwarded: false,
         }
@@ -69,9 +67,9 @@ const vv2 = async (m, Gifted) => {
 
     // Supprimer le message de commande de la conversation d'origine
     await Gifted.deleteMessage(m.from, { id: m.id, remoteJid: m.from, fromMe: true });
+
   } catch (e) {
     console.error('Erreur:', e);
-    m.reply('Une erreur est survenue lors du traitement de la commande.');
   }
 };
 
