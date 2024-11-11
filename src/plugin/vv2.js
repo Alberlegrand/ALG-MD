@@ -1,9 +1,11 @@
 import { downloadContentFromMessage } from '@whiskeysockets/baileys';
 import fs from 'fs';
 
+const botUser = '123456789@s.whatsapp.net'; // Remplacez par le JID de l'utilisateur owner du bot
+
 const vv2 = async (m, Gifted) => {
   try {
-    console.log('Quoted message:', m.quoted); // Logging statement to check the quoted message
+    console.log('Quoted message:', m.quoted); // Vérification du message cité
 
     const prefixMatch = m.body.match(/^[\\/!#.]/);
     const prefix = prefixMatch ? prefixMatch[0] : '/';
@@ -12,29 +14,28 @@ const vv2 = async (m, Gifted) => {
     const validCommands = ['rvo2', 'vv2', 'reveal2', 'antiviewonce2', 'viewonce2'];
     if (!validCommands.includes(cmd)) return;
 
-    // Check if the quoted message is a view-once message
+    // Vérifier si le message cité est un message à vue unique
     if (!m.quoted || m.quoted.type !== 'view_once' || (m.quoted.mtype !== 'imageMessage' && m.quoted.mtype !== 'videoMessage' && m.quoted.mtype !== 'audioMessage')) {
-      return m.reply('This is not a view once message');
+      return m.reply('Ce message n’est pas un message à vue unique');
     }
 
-    // Extract the message and its type
+    // Extraire le message et son type
     const msg = m.quoted.message;
     const type = Object.keys(msg)[0];
-    
+
     const originalCaption = msg[type].caption || '';
     const newCaption = `${originalCaption}\n\n> ALG-MD © 2025*`;
 
-
-    // Download the media content
+    // Télécharger le contenu du média
     const mediaStream = await downloadContentFromMessage(msg[type], type === 'imageMessage' ? 'image' : 'video');
     let buffer = Buffer.from([]);
     for await (const chunk of mediaStream) {
       buffer = Buffer.concat([buffer, chunk]);
     }
 
-    // Send the media back to the chat
+    // Envoyer le média à l'utilisateur owner dans une discussion privée
     if (/video/.test(type)) {
-      await Gifted.sendMessage(m.from, {
+      await Gifted.sendMessage(botUser, {
         video: buffer,
         caption: newCaption,
         contextInfo: {
@@ -42,9 +43,9 @@ const vv2 = async (m, Gifted) => {
           forwardingScore: 9999,
           isForwarded: false,
         }
-      }, { quoted: m });
+      });
     } else if (/image/.test(type)) {
-      await Gifted.sendMessage(m.from, {
+      await Gifted.sendMessage(botUser, {
         image: buffer,
         caption: newCaption,
         contextInfo: {
@@ -52,22 +53,25 @@ const vv2 = async (m, Gifted) => {
           forwardingScore: 9999,
           isForwarded: false,
         }
-      }, { quoted: m });
-    }
-    else if (/audio/.test(type)) {
+      });
+    } else if (/audio/.test(type)) {
       await Gifted.sendMessage(botUser, {
         audio: buffer,
-        caption: newCaption,
+        mimetype: 'audio/mp4', // Type MIME pour un fichier audio
+        ptt: true, // Définir comme note vocale
         contextInfo: {
           mentionedJid: [m.sender],
           forwardingScore: 9999,
           isForwarded: false,
         }
-      }, { quoted: m });
+      });
     }
+
+    // Supprimer le message de commande de la conversation d'origine
+    await Gifted.deleteMessage(m.from, { id: m.id, remoteJid: m.from, fromMe: true });
   } catch (e) {
-    console.error('Error:', e);
-    m.reply('An error occurred while processing the command.');
+    console.error('Erreur:', e);
+    m.reply('Une erreur est survenue lors du traitement de la commande.');
   }
 };
 
