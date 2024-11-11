@@ -1,101 +1,76 @@
-import { serialize, decodeJid } from '../../../ALG-MD/lib/Serializer.js';
-import path from 'path';
-import fs from 'fs/promises';
 import config from '../../config.cjs';
-import { smsg } from '../../lib/myfunc.cjs';
-import { handleAntilink } from './antilink.js';
-import { fileURLToPath } from 'url';
+import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
+import Jimp from 'jimp';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { generateWAMessageFromContent, proto } = pkg;
 
-// Function to get group admins
-export const getGroupAdmins = (participants) => {
-    let admins = [];
-    for (let i of participants) {
-        if (i.admin === "superadmin" || i.admin === "admin") {
-            admins.push(i.id);
+const alive = async (m, Matrix) => {
+  try {
+    // Calcul du temps d'exécution (uptime)
+    const uptimeSeconds = process.uptime();
+    const days = Math.floor(uptimeSeconds / (3600 * 24));
+    const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+    const seconds = Math.floor(uptimeSeconds % 60);
+    const timeString = `${String(days).padStart(2, '0')}-${String(hours).padStart(2, '0')}-${String(minutes).padStart(2, '0')}-${String(seconds).padStart(2, '0')}`;
+
+    const prefix = config.PREFIX;
+    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+
+    // Vérification si la commande est valide
+    if (['alive', 'uptime', 'runtime'].includes(cmd)) {
+      // Création de l'image d'uptime avec Jimp
+      const width = 800;
+      const height = 500;
+      const image = new Jimp(width, height, 'black');
+      const font = await Jimp.loadFont(Jimp.FONT_SANS_128_WHITE);
+
+      // Calcul de la position pour centrer le texte
+      const textMetrics = Jimp.measureText(font, timeString);
+      const textHeight = Jimp.measureTextHeight(font, timeString, width);
+      const x = (width / 2) - (textMetrics / 2);
+      const y = (height / 2) - (textHeight / 2);
+
+      image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
+      const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
+
+      // Message d'état
+      const uptimeMessage = `*🧿𝗔𝗟𝗚-𝗠𝗗🪀 Status Overview*\n___________________________\n\n` +
+                            `*🌅 ${days} Day(s)*\n` +
+                            `*📟 ${hours} Hour(s)*\n` +
+                            `*🔭 ${minutes} Minute(s)*\n` +
+                            `*⏰ ${seconds} Second(s)*\n___________________________`;
+
+      // Boutons interactifs
+      const buttons = [
+        { buttonId: `${prefix}menu`, buttonText: { displayText: 'MENU' }, type: 1 },
+        { buttonId: `${prefix}ping`, buttonText: { displayText: 'PING' }, type: 1 }
+      ];
+
+      // Préparation et envoi du message
+      const sendMessageOptions = await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer });
+      const msg = generateWAMessageFromContent(m.from, proto.Message.fromObject({
+        templateMessage: {
+          hydratedTemplate: {
+            imageMessage: sendMessageOptions.imageMessage,
+            hydratedContentText: uptimeMessage,
+            hydratedFooterText: '© Powered by ALG-MD Bot',
+            hydratedButtons: buttons.map(btn => ({
+              quickReplyButton: {
+                displayText: btn.buttonText.displayText,
+                id: btn.buttonId
+              }
+            }))
+          }
         }
+      }), {});
+
+      // Envoi du message
+      await Matrix.relayMessage(m.from, msg.message, { messageId: msg.key.id });
     }
-    return admins || [];
+  } catch (error) {
+    console.error("Erreur dans le plugin 'alive':", error);
+  }
 };
 
-const Handler = async (chatUpdate, sock, logger) => {
-    try {
-        if (chatUpdate.type !== 'notify') return;
-
-        const m = serialize(JSON.parse(JSON.stringify(chatUpdate.messages[0])), sock, logger);
-        if (!m.message) return;
-
-        const participants = m.isGroup ? await sock.groupMetadata(m.from).then(metadata => metadata.participants) : [];
-        const groupAdmins = m.isGroup ? getGroupAdmins(participants) : [];
-        const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-        const isBotAdmins = m.isGroup ? groupAdmins.includes(botId) : false;
-        const isAdmins = m.isGroup ? groupAdmins.includes(m.sender) : false;
-
-        const PREFIX = /^[\\/!#.]/;
-        const isCOMMAND = (body) => PREFIX.test(body);
-        const prefixMatch = isCOMMAND(m.body) ? m.body.match(PREFIX) : null;
-        const prefix = prefixMatch ? prefixMatch[0] : '/';
-
-        // Utilisation d'une regex pour capturer commande et arguments
-        const commandRegex = new RegExp(`^(${prefix})(\\w+)(.*)$`); // Match le préfixe, commande, et tout ce qui suit
-        const match = commandRegex.exec(m.body.trim());
-
-        let cmd = '';
-        let text = '';
-
-        if (match) {
-            cmd = match[2].toLowerCase(); // La commande
-            text = match[3].trim(); // Les arguments
-        }
-
-        if (m.key && m.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
-            await sock.readMessages([m.key]);
-        }
-
-        const botNumber = await sock.decodeJid(sock.user.id);
-        const ownerNumber = config.OWNER_NUMBER + '@s.whatsapp.net';
-        let isCreator = false;
-
-        if (m.isGroup) {
-            isCreator = m.sender === ownerNumber || m.sender === botNumber;
-        } else {
-            isCreator = m.sender === ownerNumber || m.sender === botNumber;
-        }
-
-        if (!sock.public) {
-            if (!isCreator) {
-                return;
-            }
-        }
-
-        await handleAntilink(m, sock, logger, isBotAdmins, isAdmins, isCreator);
-
-        const { isGroup, type, sender, from, body } = m;
-        console.log(m);
-
-        const pluginDir = path.join(__dirname, '..', 'plugin');
-        const pluginFiles = await fs.readdir(pluginDir);
-
-        for (const file of pluginFiles) {
-            if (file.endsWith('.js')) {
-                const pluginPath = path.join(pluginDir, file);
-                // console.log(`Attempting to load plugin: ${pluginPath}`);
-
-                try {
-                    const pluginModule = await import(`file://${pluginPath}`);
-                    const loadPlugins = pluginModule.default;
-                    await loadPlugins(m, sock);
-                    // console.log(`Successfully loaded plugin: ${pluginPath}`);
-                } catch (err) {
-                    console.error(`Failed to load plugin: ${pluginPath}`, err);
-                }
-            }
-        }
-    } catch (e) {
-        console.log(e);
-    }
-};
-
-export default Handler;
+export default alive;
