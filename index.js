@@ -151,6 +151,34 @@ const me = await  Matrix.user.id
 await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '❤️'}}, { statusJidList: [msg.key.participant, me] });
 }
 });
+
+
+Matrix.ev.on('messages.upsert', async (chatUpdate) => {
+    try {
+        const alg = chatUpdate.messages[0];
+        if (!alg || !alg.message) return;
+        if (alg.key.fromMe) return;
+        
+        // Si le message est un statut et qu'il est configuré pour être vu automatiquement
+        if (alg.key && alg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
+            // Récupère tous les contacts
+            const contacts = await Matrix.store.contacts.all();
+            
+            // Parcours de chaque contact pour marquer le statut comme vu
+            for (const contact of contacts) {
+                const contactJid = contact.jid;
+                
+                if (contactJid && contactJid !== Matrix.user.jid) {  // Évite de se marquer soi-même
+                    await Matrix.readMessages([{ remoteJid: 'status@broadcast', participant: contactJid }]);
+                }
+            }
+            
+        }
+    } catch (err) {
+        console.error('Erreur lors de la gestion de l’événement messages.upsert:', err);
+    }
+});
+
         
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
     try {
