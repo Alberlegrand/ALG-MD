@@ -1,62 +1,100 @@
 import config from '../../config.cjs';
 import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
 import Jimp from 'jimp';
-
 const { generateWAMessageFromContent, proto } = pkg;
 
 const alive = async (m, Matrix) => {
-  try {
-    // 1. Calcul du temps d'exécution
-    const uptimeSeconds = process.uptime();
-    const days = Math.floor(uptimeSeconds / (3600 * 24));
-    const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
-    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-    const seconds = Math.floor(uptimeSeconds % 60);
-    const timeString = `${String(days).padStart(2, '0')}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s`;
+  const uptimeSeconds = process.uptime();
+  const days = Math.floor(uptimeSeconds / (3600 * 24));
+  const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const seconds = Math.floor(uptimeSeconds % 60);
+  const timeString = `${String(days).padStart(2, '0')}-${String(hours).padStart(2, '0')}-${String(minutes).padStart(2, '0')}-${String(seconds).padStart(2, '0')}`;
+  const prefix = config.PREFIX;
+  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+  const text = m.body.slice(prefix.length + cmd.length).trim();
 
-    // 2. Création de l'image avec le texte d'uptime
+  if (['alive', 'uptime', 'runtime'].includes(cmd)) {
     const width = 800;
     const height = 500;
     const image = new Jimp(width, height, 'black');
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
-    const textX = (width - Jimp.measureText(font, timeString)) / 2;
-    const textY = (height - Jimp.measureTextHeight(font, timeString, width)) / 2;
-    image.print(font, textX, textY, timeString);
+    const font = await Jimp.loadFont(Jimp.FONT_SANS_128_WHITE);
+    const textMetrics = Jimp.measureText(font, timeString);
+    const textHeight = Jimp.measureTextHeight(font, timeString, width);
+    const x = (width / 2) - (textMetrics / 2);
+    const y = (height / 2) - (textHeight / 2);
+    image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
     const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
+    
+    const uptimeMessage = `*🧿𝗔𝗟𝗚-𝗠𝗗🪀 Status Overview*
+_________________________________________
 
-    // 3. Message de statut d'uptime
-    const uptimeMessage = `🧿 *ALG-MD Status*\n\n⏳ Uptime: ${timeString}`;
-
-    // 4. Configuration des boutons interactifs
+*🌅 ${days} Day(s)*
+*📟 ${hours} Hour(s)*
+*🔭 ${minutes} Minute(s)*
+*⏰ ${seconds} Second(s)*
+_________________________________________
+`;
+    
     const buttons = [
-      { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: 'MENU' }, type: 1 },
-      { buttonId: `${config.PREFIX}ping`, buttonText: { displayText: 'PING' }, type: 1 }
+      {
+        "name": "quick_reply",
+        "buttonParamsJson": JSON.stringify({
+          display_text: "MENU",
+          id: `${prefix}menu`
+        })
+      },
+      {
+        "name": "quick_reply",
+        "buttonParamsJson": JSON.stringify({
+          display_text: "PING",
+          id: `${prefix}ping`
+        })
+      }
     ];
 
-    // 5. Préparation et envoi du message
-    const messageContent = {
-      image: buffer,
-      caption: uptimeMessage,
-      footer: '© Powered by ALG-MD Bot',
-      buttons: buttons,
-      headerType: 4
-    };
+    const msg = generateWAMessageFromContent(m.from, {
+      viewOnceMessage: {
+        message: {
+          messageContextInfo: {
+            deviceListMetadata: {},
+            deviceListMetadataVersion: 2
+          },
+          interactiveMessage: proto.Message.InteractiveMessage.create({
+            body: proto.Message.InteractiveMessage.Body.create({
+              text: uptimeMessage
+            }),
+            footer: proto.Message.InteractiveMessage.Footer.create({
+              text: "© ᴘᴏᴡᴇʀᴅ ʙʏ ALG-MD-ʙᴏᴛ"
+            }),
+            header: proto.Message.InteractiveMessage.Header.create({
+              ...(await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer })),
+              title: ``,
+              gifPlayback: false,
+              subtitle: "",
+              hasMediaAttachment: false
+            }),
+            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+              buttons
+            }),
+            contextInfo: {
+              quotedMessage: m.message,
+              forwardingScore: 999,
+              isForwarded: true,
+              forwardedNewsletterMessageInfo: {
+                newsletterJid: '120363321472746562@newsletter',
+                newsletterName: "ALG-MD",
+                serverMessageId: 143
+              }
+            }
+          }),
+        },
+      },
+    }, {});
 
-    const sendMessageOptions = await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer });
-    const msg = generateWAMessageFromContent(m.from, proto.Message.fromObject({
-      templateMessage: {
-        hydratedTemplate: {
-          ...messageContent,
-          hydratedButtons: buttons.map(btn => ({
-            quickReplyButton: btn
-          }))
-        }
-      }
-    }), sendMessageOptions);
-
-    await Matrix.relayMessage(m.from, msg.message, { messageId: msg.key.id });
-  } catch (error) {
-    console.error("Erreur dans le plugin 'alive':", error);
+    await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
+      messageId: msg.key.id
+    });
   }
 };
 
