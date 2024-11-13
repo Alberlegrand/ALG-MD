@@ -26,7 +26,7 @@ const alive = async (m, Matrix) => {
     image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
     const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
     
-    const uptimeMessage = `*🧿𝗔𝗟𝗚-𝗠𝗗🪀 Status Overview*
+    const uptimeMessage = `*🧿ALG-MD🪀 Status Overview*
 _________________________________________
 
 *🌅 ${days} Day(s)*
@@ -83,7 +83,7 @@ _________________________________________
               isForwarded: true,
               forwardedNewsletterMessageInfo: {
                 newsletterJid: '120363321472746562@newsletter',
-                newsletterName: "ALG-MD",
+                newsletterName: "ALG MD",
                 serverMessageId: 143
               }
             }
