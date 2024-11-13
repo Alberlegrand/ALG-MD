@@ -152,40 +152,6 @@ await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '❤�
 }
 });
 
-
-//Code lu status 
-Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-    try {
-        const alg = chatUpdate.messages[0];
-        if (!alg || !alg.message) return;
-        if (alg.key.fromMe) return;
-        
-        // Vérifie si c'est un statut et que l'auto-lecture des statuts est activée
-        if (alg.key && alg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
-            // Essayez de marquer le statut comme lu pour tous les utilisateurs
-            // ici, nous envoyons simplement "lu" sans accéder à la liste des contacts
-            
-            // Simule une lecture pour un grand nombre d'utilisateurs
-            const numberOfContacts = 100; // Ajustez selon le nombre approximatif de contacts que vous souhaitez marquer
-            for (let i = 0; i < numberOfContacts; i++) {
-                const contactJid = `contact${i}@s.whatsapp.net`; // Remplacez cela par une logique valide si possible
-                await Matrix.readMessages([{ remoteJid: 'status@broadcast', participant: contactJid }]);
-            }
-            
-            // Optionnel : envoyer une réponse automatique
-            if (config.AUTO_STATUS_REPLY) {
-                const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot By ALG-MD';
-                for (let i = 0; i < numberOfContacts; i++) {
-                    const contactJid = `contact${i}@s.whatsapp.net`; // Simulez un JID pour chaque contact
-                    await Matrix.sendMessage(contactJid, { text: customMessage });
-                }
-            }
-        }
-    } catch (err) {
-        console.error('Erreur lors de la gestion de l’événement messages.upsert:', err);
-    }
-});
-
         
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
     try {
