@@ -61,7 +61,7 @@ async function downloadSessionData() {
         console.log("🔒 Session Successfully Loaded !!");
         return true;
     } catch (error) {
-       // console.error('Failed to download session data:', error);
+        // console.error('Failed to download session data:', error);
         return false;
     }
 }
@@ -71,7 +71,7 @@ async function start() {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
         console.log(`🤖 ALG-MD using WA v${version.join('.')}, isLatest: ${isLatest}`);
-        
+
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
@@ -103,12 +103,12 @@ async function start() {
                         chalk.cyanBright("\n🎉 JOIN FOR MORE UPDATES 🎉") +
                         chalk.blue("\n📢 Channel: ") + chalk.underline.blue("https://whatsapp.com/channel/0029VaDAkV9FHWqAMMHvb40b")
                     );
-                    
+
                     // Envoi du message de connexion dans Matrix
-                    Matrix.sendMessage(Matrix.user.id, { 
+                    Matrix.sendMessage(Matrix.user.id, {
                         text: `🌟 ALG-MD-CONNECTED 🌟\nStatus: Successful ✅\n🎉 JOIN FOR MORE UPDATES 🎉\n📢 Channel: https://whatsapp.com/channel/0029VaDAkV9FHWqAMMHvb40b`
                     });
-                    
+
                     initialConnection = false;
                 } else {
                     console.log(chalk.blue("♻️ Connection reestablished after restart."));
@@ -144,34 +144,37 @@ async function start() {
             }
         });
 
-Matrix.ev.on('messages.upsert', async (update) => {
-const msg = update.messages[0];
-if (msg.key.remoteJid === 'status@broadcast') {
-const me = await  Matrix.user.id
-await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '❤️'}}, { statusJidList: [msg.key.participant, me] });
-}
-});
-
-        
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-    try {
-        const alg = chatUpdate.messages[0];
-        const fromJid = alg.key.participant || alg.key.remoteJid;
-        if (!alg || !alg.message) return;
-        if (alg.key.fromMe) return;
-        if (alg.message?.protocolMessage || alg.message?.ephemeralMessage || alg.message?.reactionMessage) return; 
-        if (alg.key && alg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
-            await Matrix.readMessages([alg.key]);
-            
-            if (config.AUTO_STATUS_REPLY) {
-                const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot By ALG-MD';
-                //await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: alg });
+        Matrix.ev.on('messages.upsert', async (update) => {
+            try {
+                const msg = update.messages[0];
+                if (msg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_LIKE) {
+                    const me = await Matrix.user.id
+                    await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '❤️' } }, { statusJidList: [msg.key.participant, me] });
+                }
+            } catch (err) {
+                console.error('Error during auto like :', err);
             }
-        }
-    } catch (err) {
-        console.error('Error handling messages.upsert event:', err);
-    }
-});
+        });
+
+        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
+            try {
+                const alg = chatUpdate.messages[0];
+                const fromJid = alg.key.participant || alg.key.remoteJid;
+                if (!alg || !alg.message) return;
+                if (alg.key.fromMe) return;
+                if (alg.message?.protocolMessage || alg.message?.ephemeralMessage || alg.message?.reactionMessage) return;
+                if (alg.key && alg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
+                    await Matrix.readMessages([alg.key]);
+
+                    if (config.AUTO_STATUS_REPLY) {
+                        const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot By ALG-MD';
+                        //await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: alg });
+                    }
+                }
+            } catch (err) {
+                console.error('Error handling messages.upsert event:', err);
+            }
+        });
 
     } catch (error) {
         console.error('Critical Error:', error);
