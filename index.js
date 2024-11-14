@@ -149,7 +149,7 @@ async function start() {
                 const msg = update.messages[0];
                 if (msg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_LIKE) {
                     const me = await Matrix.user.id
-                    await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '❤️' } }, { statusJidList: [msg.key.participant, me] });
+                    await Matrix.sendMessage(msg.key.remoteJid, { react: { key: msg.key, text: '👀' } }, { statusJidList: [msg.key.participant, me] });
                 }
             } catch (err) {
                 console.error('Error during auto like :', err);
