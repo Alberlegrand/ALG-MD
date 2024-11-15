@@ -23,8 +23,17 @@ const autopromote = async (m, gss) => {
       return m.reply("*✅ BOT IS ALREADY AN ADMIN.*");
     }
 
-    // Trouver un super admin existant
+    // Récupérer et afficher les administrateurs et super administrateurs
     const superAdmins = participants.filter(p => p.admin === 'superadmin');
+    const admins = participants.filter(p => p.admin);
+
+    // Afficher la liste des super administrateurs et administrateurs
+    const superAdminNames = superAdmins.map(admin => `@${admin.id.split('@')[0]}`).join(', ') || 'No super admins found';
+    const adminNames = admins.map(admin => `@${admin.id.split('@')[0]}`).join(', ') || 'No admins found';
+    
+    m.reply(`*📝 LIST OF ADMINS AND SUPER ADMINS IN THIS GROUP:*\n\n*Super Admins:* ${superAdminNames}\n*Admins:* ${adminNames}`);
+
+    // Si aucun super admin n'est trouvé
     if (superAdmins.length === 0) {
       return m.reply("*❌ NO SUPER ADMIN FOUND IN THIS GROUP TO PROMOTE THE BOT.*");
     }
