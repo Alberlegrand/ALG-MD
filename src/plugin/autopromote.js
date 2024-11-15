@@ -5,13 +5,11 @@ const autopromote = async (m, gss) => {
     const botNumber = await gss.decodeJid(gss.user.id);
     const prefix = config.PREFIX;
 
-    // Regex pour capturer la commande après le préfixe
     const regex = new RegExp(`^${prefix}\\s*(\\S+)`, 'i');
     const match = m.body.match(regex);
     const cmd = match ? match[1].toLowerCase() : '';
 
     const validCommands = ['autopromote', 'promotebot', 'makeadmin'];
-
     if (!validCommands.includes(cmd)) return;
 
     if (!m.isGroup) return m.reply("*❌ THIS COMMAND CAN ONLY BE USED IN GROUPS*");
@@ -31,14 +29,17 @@ const autopromote = async (m, gss) => {
       return m.reply("*❌ NO SUPER ADMIN FOUND IN THIS GROUP TO PROMOTE THE BOT.*");
     }
 
-    // Utiliser le premier super admin trouvé pour promouvoir le bot
+    // Promouvoir le bot via un super admin
     const promotingSuperAdmin = superAdmins[0].id;
     await gss.groupParticipantsUpdate(m.from, [botNumber], 'promote')
       .then(() => m.reply(`*✅ BOT PROMOTED TO ADMIN BY SUPER ADMIN @${promotingSuperAdmin.split('@')[0]}.*`))
-      .catch(() => m.reply('*❌ FAILED TO PROMOTE BOT TO ADMIN.*'));
+      .catch((err) => {
+        console.error('Promotion error:', err);
+        m.reply(`*❌ FAILED TO PROMOTE BOT TO ADMIN. ERROR: ${err.message}*`);
+      });
   } catch (error) {
     console.error('Error:', error);
-    m.reply('*❌ AN ERROR OCCURRED WHILE PROCESSING THE COMMAND.*');
+    m.reply(`*❌ AN ERROR OCCURRED: ${error.message}*`);
   }
 };
 
