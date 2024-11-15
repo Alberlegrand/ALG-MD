@@ -25,17 +25,16 @@ const autopromote = async (m, gss) => {
       return m.reply("*✅ BOT IS ALREADY A SUPER ADMIN.*");
     }
 
-    // Vérifier les administrateurs actuels
-    const currentAdmins = participants.filter(p => p.admin);
-
-    if (currentAdmins.length === 0) {
-      return m.reply("*❌ NO ADMIN FOUND IN THIS GROUP.*");
+    // Trouver un super admin existant dans le groupe
+    const superAdmins = participants.filter(p => p.admin === 'superadmin');
+    if (superAdmins.length === 0) {
+      return m.reply("*❌ NO SUPER ADMIN FOUND IN THIS GROUP TO PROMOTE THE BOT.*");
     }
 
-    // Promouvoir le bot via un des administrateurs actuels
-    const promotingAdmin = currentAdmins[0].id;
+    // Utiliser le premier super admin pour promouvoir le bot
+    const promotingSuperAdmin = superAdmins[0].id;
     await gss.groupParticipantsUpdate(m.from, [botNumber], 'promote')
-      .then(() => m.reply(`*✅ BOT PROMOTED SUCCESSFULLY TO SUPER ADMIN BY @${promotingAdmin.split('@')[0]}.*`))
+      .then(() => m.reply(`*✅ BOT PROMOTED SUCCESSFULLY TO SUPER ADMIN BY @${promotingSuperAdmin.split('@')[0]}.*`))
       .catch(() => m.reply('*❌ FAILED TO PROMOTE BOT.*'));
   } catch (error) {
     console.error('Error:', error);
