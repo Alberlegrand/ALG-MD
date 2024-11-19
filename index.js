@@ -171,6 +171,41 @@ async function start() {
   }
 });
 
+
+//Anti delete
+
+Matrix.ev.on('message.delete', async (message) => {
+  try {
+    if (!config.ANTI_DELETE) return;
+
+    const { remoteJid, participant, id } = message.key;
+    const isGroup = remoteJid.endsWith('@g.us');
+    const participantId = participant || remoteJid;
+
+    // Fetch deleted message content
+    const deletedMessage = await Matrix.loadMessage(remoteJid, id);
+
+    if (deletedMessage) {
+      const messageContent = deletedMessage.message.conversation || 
+                             deletedMessage.message.extendedTextMessage?.text || 
+                             '[Unsupported message type]';
+
+      // Notify about deleted message
+      const notification = `*🛑 Anti-Delete Triggered*\n\n` +
+                           `*Group:* ${isGroup ? remoteJid.split('@')[0] : 'Private Chat'}\n` +
+                           `*User:* @${participantId.split('@')[0]}\n` +
+                           `*Message:* ${messageContent}`;
+
+      await Matrix.sendMessage(remoteJid, { text: notification, mentions: [participantId] });
+    } else {
+      console.log('Deleted message could not be loaded.');
+    }
+  } catch (error) {
+    console.error('Error handling deleted message:', error);
+  }
+});
+
+
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const alg = chatUpdate.messages[0];
