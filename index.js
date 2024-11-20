@@ -174,11 +174,10 @@ async function start() {
 
 //Anti delete
 
-const isAntiDeleteEnabled = (config.ANTI_DELETE || 'false').toLowerCase() === "true";
 let textMessagesMap = new Map();
 let mediaMessagesMap = new Map();
 
-if (isAntiDeleteEnabled) {
+if (config.ANTI_DELETE) {
   Matrix.ev.on("messages.upsert", async messageEvent => {
     const { messages } = messageEvent; 
     const newMessage = messages[0]; // Premier message de la mise à jour
