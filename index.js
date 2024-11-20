@@ -174,36 +174,111 @@ async function start() {
 
 //Anti delete
 
-Matrix.ev.on('message.delete', async (message) => {
-  try {
-    if (!config.ANTI_DELETE) return;
+const isAntiDeleteEnabled = (config.ANTI_DELETE || 'false').toLowerCase() === "true";
+let textMessagesMap = new Map();
+let mediaMessagesMap = new Map();
 
-    const { remoteJid, participant, id } = message.key;
-    const isGroup = remoteJid.endsWith('@g.us');
-    const participantId = participant || remoteJid;
+if (isAntiDeleteEnabled) {
+  Matrix.ev.on("messages.upsert", async messageEvent => {
+    const { messages } = messageEvent; 
+    const newMessage = messages[0]; // Premier message de la mise à jour
 
-    // Fetch deleted message content
-    const deletedMessage = await Matrix.loadMessage(remoteJid, id);
-
-    if (deletedMessage) {
-      const messageContent = deletedMessage.message.conversation || 
-                             deletedMessage.message.extendedTextMessage?.text || 
-                             '[Unsupported message type]';
-
-      // Notify about deleted message
-      const notification = `*🛑 Anti-Delete Triggered*\n\n` +
-                           `*Group:* ${isGroup ? remoteJid.split('@')[0] : 'Private Chat'}\n` +
-                           `*User:* @${participantId.split('@')[0]}\n` +
-                           `*Message:* ${messageContent}`;
-
-      await Matrix.sendMessage(remoteJid, { text: notification, mentions: [participantId] });
-    } else {
-      console.log('Deleted message could not be loaded.');
+    if (!newMessage.message) {
+      return; // Sort si aucun contenu n'est présent
     }
-  } catch (error) {
-    console.error('Error handling deleted message:', error);
-  }
-});
+
+    const chatId = newMessage.key.remoteJid;
+
+    // Ne pas traiter les messages envoyés par le bot lui-même
+    if (!newMessage.key.fromMe) {
+      // Vérifie le type de message et stocke les données appropriées
+      if (newMessage.message.imageMessage) {
+        mediaMessagesMap.set(newMessage.key.id, {
+          type: "image",
+          fileUrl: newMessage.message.imageMessage.url,
+          mimeType: newMessage.message.imageMessage.mimetype
+        });
+      } else if (newMessage.message.videoMessage) {
+        mediaMessagesMap.set(newMessage.key.id, {
+          type: "video",
+          fileUrl: newMessage.message.videoMessage.url,
+          mimeType: newMessage.message.videoMessage.mimetype
+        });
+      } else if (newMessage.message.documentMessage) {
+        mediaMessagesMap.set(newMessage.key.id, {
+          type: "document",
+          fileUrl: newMessage.message.documentMessage.url,
+          mimeType: newMessage.message.documentMessage.mimetype
+        });
+      } else if (newMessage.message.audioMessage) {
+        mediaMessagesMap.set(newMessage.key.id, {
+          type: "audio",
+          fileUrl: newMessage.message.audioMessage.url,
+          mimeType: newMessage.message.audioMessage.mimetype
+        });
+      } else if (newMessage.message.stickerMessage) {
+        mediaMessagesMap.set(newMessage.key.id, {
+          type: "sticker",
+          fileUrl: newMessage.message.stickerMessage.url
+        });
+      } else if (newMessage.message.conversation) {
+        textMessagesMap.set(newMessage.key.id, newMessage);
+      }
+
+      // Si le message n'est pas un média ou un texte, l'ajouter par défaut dans le texte
+      if (!mediaMessagesMap.has(newMessage.key.id) && !textMessagesMap.has(newMessage.key.id)) {
+        textMessagesMap.set(newMessage.key.id, newMessage);
+      }
+
+      // Détecte les messages supprimés
+      if (newMessage.message.protocolMessage && newMessage.message.protocolMessage.type === 0) {
+        const deletedMessageKey = newMessage.message.protocolMessage.key;
+        const deletedMediaMessage = mediaMessagesMap.get(deletedMessageKey.id);
+        const deletedTextMessage = textMessagesMap.get(deletedMessageKey.id);
+        const deleterId = deletedTextMessage
+          ? deletedTextMessage.key.participant || deletedTextMessage.key.remoteJid
+          : newMessage.key.remoteJid;
+
+        if (deletedMediaMessage) {
+          const alertText = `*[ANTIDELETE DETECTED]*\n\n*Deleted By:* @${deleterId.split('@')[0]}\n*Message Type:* ${deletedMediaMessage.type}\n*Message:* ${
+            deletedMediaMessage.type === "document" ? "Document" : "Media"
+          }\n*Media MIME Type:* ${deletedMediaMessage.mimeType || "No MIME Type"}`;
+          let alertMedia;
+
+          if (deletedMediaMessage.type === "image") {
+            alertMedia = { image: { url: deletedMediaMessage.fileUrl } };
+          } else if (deletedMediaMessage.type === "video") {
+            alertMedia = { video: { url: deletedMediaMessage.fileUrl } };
+          } else if (deletedMediaMessage.type === "audio") {
+            alertMedia = { audio: { url: deletedMediaMessage.fileUrl } };
+          } else if (deletedMediaMessage.type === "document") {
+            alertMedia = { document: { url: deletedMediaMessage.fileUrl } };
+          } else if (deletedMediaMessage.type === "sticker") {
+            alertMedia = { sticker: { url: deletedMediaMessage.fileUrl } };
+          }
+
+          await Matrix.sendMessage(chatId, {
+            text: alertText,
+            mentions: [deleterId],
+            ...alertMedia
+          });
+
+          mediaMessagesMap.delete(deletedMessageKey.id);
+        } else if (deletedTextMessage) {
+          const alertText = `*[ANTIDELETE DETECTED]*\n\n*Deleted By:* @${deleterId.split('@')[0]}\n*Message:* ${
+            deletedTextMessage.message.conversation || "Text message deleted"
+          }`;
+
+          await Matrix.sendMessage(chatId, {
+            text: alertText,
+            mentions: [deleterId]
+          });
+        }
+      }
+    }
+  });
+}
+
 
 
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
