@@ -193,7 +193,7 @@ const createDownloadsDir = async (chatId) => {
       await sendLogMessage(chatId, `Erreur lors de la création du répertoire : ${err.message}`);
     }
   } else {
-    await sendLogMessage(chatId, `Répertoire "${downloadsDir}" déjà existant.`);
+    //await sendLogMessage(chatId, `Répertoire "${downloadsDir}" déjà existant.`);
   }
 };
 
