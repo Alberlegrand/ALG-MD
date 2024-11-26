@@ -172,111 +172,97 @@ async function start() {
 });
 
 
-//Anti delete
+// Anti-Delete - Simple et compatible
+const textMessagesMap = new Map();
+const mediaMessagesMap = new Map();
 
-let textMessagesMap = new Map();
-let mediaMessagesMap = new Map();
-
+// Vérifie si l'Anti-Delete est activé dans la configuration
 if (config.ANTI_DELETE) {
-  Matrix.ev.on("messages.upsert", async messageEvent => {
-    const { messages } = messageEvent; 
-    const newMessage = messages[0]; // Premier message de la mise à jour
+  Matrix.ev.on("messages.upsert", async (messageEvent) => {
+    const { messages } = messageEvent;
+    const newMessage = messages[0]; // Récupère le premier message
 
-    if (!newMessage.message) {
-      return; // Sort si aucun contenu n'est présent
-    }
+    // Ne rien faire si le message est vide
+    if (!newMessage.message) return;
 
-    const chatId = newMessage.key.remoteJid;
+    const chatId = newMessage.key.remoteJid; // ID du chat
 
-    // Ne pas traiter les messages envoyés par le bot lui-même
+    // Ignorer les messages envoyés par le bot lui-même
     if (!newMessage.key.fromMe) {
-      // Vérifie le type de message et stocke les données appropriées
-      if (newMessage.message.imageMessage) {
-        mediaMessagesMap.set(newMessage.key.id, {
-          type: "image",
-          fileUrl: newMessage.message.imageMessage.url,
-          mimeType: newMessage.message.imageMessage.mimetype
-        });
-      } else if (newMessage.message.videoMessage) {
-        mediaMessagesMap.set(newMessage.key.id, {
-          type: "video",
-          fileUrl: newMessage.message.videoMessage.url,
-          mimeType: newMessage.message.videoMessage.mimetype
-        });
-      } else if (newMessage.message.documentMessage) {
-        mediaMessagesMap.set(newMessage.key.id, {
-          type: "document",
-          fileUrl: newMessage.message.documentMessage.url,
-          mimeType: newMessage.message.documentMessage.mimetype
-        });
-      } else if (newMessage.message.audioMessage) {
-        mediaMessagesMap.set(newMessage.key.id, {
-          type: "audio",
-          fileUrl: newMessage.message.audioMessage.url,
-          mimeType: newMessage.message.audioMessage.mimetype
-        });
-      } else if (newMessage.message.stickerMessage) {
-        mediaMessagesMap.set(newMessage.key.id, {
-          type: "sticker",
-          fileUrl: newMessage.message.stickerMessage.url
-        });
-      } else if (newMessage.message.conversation) {
+      // Stocke les messages texte et médias pour détection ultérieure
+      if (newMessage.message.conversation) {
         textMessagesMap.set(newMessage.key.id, newMessage);
+      } else if (newMessage.message.imageMessage || newMessage.message.videoMessage ||
+        newMessage.message.audioMessage || newMessage.message.documentMessage ||
+        newMessage.message.stickerMessage) {
+        mediaMessagesMap.set(newMessage.key.id, {
+          type: newMessage.message.imageMessage ? "image" :
+            newMessage.message.videoMessage ? "video" :
+              newMessage.message.audioMessage ? "audio" :
+                newMessage.message.documentMessage ? "document" : "sticker",
+          fileUrl: newMessage.message.imageMessage?.url ||
+            newMessage.message.videoMessage?.url ||
+            newMessage.message.audioMessage?.url ||
+            newMessage.message.documentMessage?.url ||
+            newMessage.message.stickerMessage?.url,
+          mimeType: newMessage.message.imageMessage?.mimetype ||
+            newMessage.message.videoMessage?.mimetype ||
+            newMessage.message.audioMessage?.mimetype ||
+            newMessage.message.documentMessage?.mimetype || null,
+        });
       }
 
-      // Si le message n'est pas un média ou un texte, l'ajouter par défaut dans le texte
-      if (!mediaMessagesMap.has(newMessage.key.id) && !textMessagesMap.has(newMessage.key.id)) {
-        textMessagesMap.set(newMessage.key.id, newMessage);
-      }
-
-      // Détecte les messages supprimés
-      if (newMessage.message.protocolMessage && newMessage.message.protocolMessage.type === 0) {
+      // Gère les messages supprimés
+      if (newMessage.message.protocolMessage &&
+        newMessage.message.protocolMessage.type === 0) {
         const deletedMessageKey = newMessage.message.protocolMessage.key;
-        const deletedMediaMessage = mediaMessagesMap.get(deletedMessageKey.id);
+
+        // Récupère les informations sur le message supprimé
         const deletedTextMessage = textMessagesMap.get(deletedMessageKey.id);
-        const deleterId = deletedTextMessage
-          ? deletedTextMessage.key.participant || deletedTextMessage.key.remoteJid
-          : newMessage.key.remoteJid;
+        const deletedMediaMessage = mediaMessagesMap.get(deletedMessageKey.id);
+        const deleterId = deletedTextMessage?.key.participant || deletedTextMessage?.key.remoteJid || newMessage.key.remoteJid;
 
         if (deletedMediaMessage) {
-          const alertText = `*[ANTIDELETE DETECTED]*\n\n*Deleted By:* @${deleterId.split('@')[0]}\n*Message Type:* ${deletedMediaMessage.type}\n*Message:* ${
-            deletedMediaMessage.type === "document" ? "Document" : "Media"
-          }\n*Media MIME Type:* ${deletedMediaMessage.mimeType || "No MIME Type"}`;
-          let alertMedia;
+          // Envoie une alerte pour les médias supprimés
+          const alertText = `*[ANTI-DELETE]*\n\n*Supprimé par:* @${deleterId.split('@')[0]}\n*Type de message:* ${deletedMediaMessage.type}`;
+          let mediaAlert = {};
 
+          // Crée une réponse basée sur le type de média
           if (deletedMediaMessage.type === "image") {
-            alertMedia = { image: { url: deletedMediaMessage.fileUrl } };
+            mediaAlert = { image: { url: deletedMediaMessage.fileUrl } };
           } else if (deletedMediaMessage.type === "video") {
-            alertMedia = { video: { url: deletedMediaMessage.fileUrl } };
+            mediaAlert = { video: { url: deletedMediaMessage.fileUrl } };
           } else if (deletedMediaMessage.type === "audio") {
-            alertMedia = { audio: { url: deletedMediaMessage.fileUrl } };
+            mediaAlert = { audio: { url: deletedMediaMessage.fileUrl } };
           } else if (deletedMediaMessage.type === "document") {
-            alertMedia = { document: { url: deletedMediaMessage.fileUrl } };
+            mediaAlert = { document: { url: deletedMediaMessage.fileUrl } };
           } else if (deletedMediaMessage.type === "sticker") {
-            alertMedia = { sticker: { url: deletedMediaMessage.fileUrl } };
+            mediaAlert = { sticker: { url: deletedMediaMessage.fileUrl } };
           }
 
           await Matrix.sendMessage(chatId, {
             text: alertText,
             mentions: [deleterId],
-            ...alertMedia
+            ...mediaAlert,
           });
 
           mediaMessagesMap.delete(deletedMessageKey.id);
         } else if (deletedTextMessage) {
-          const alertText = `*[ANTIDELETE DETECTED]*\n\n*Deleted By:* @${deleterId.split('@')[0]}\n*Message:* ${
-            deletedTextMessage.message.conversation || "Text message deleted"
-          }`;
+          // Envoie une alerte pour les messages texte supprimés
+          const alertText = `*[ANTI-DELETE]*\n\n*Supprimé par:* @${deleterId.split('@')[0]}\n*Message supprimé:* ${deletedTextMessage.message.conversation || "Inconnu"}`;
 
           await Matrix.sendMessage(chatId, {
             text: alertText,
-            mentions: [deleterId]
+            mentions: [deleterId],
           });
+
+          textMessagesMap.delete(deletedMessageKey.id);
         }
       }
     }
   });
 }
+
 
 
 
