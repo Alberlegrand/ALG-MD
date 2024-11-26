@@ -172,30 +172,59 @@ async function start() {
 });
 
 
-
-// Création automatique du répertoire "downloads" au lancement
 const downloadsDir = path.resolve(__dirname, "downloads");
-if (!fs.existsSync(downloadsDir)) {
-  fs.mkdirSync(downloadsDir, { recursive: true }); // Création récursive pour s'assurer que tous les dossiers sont créés
-  console.log(`Répertoire "${downloadsDir}" créé avec succès.`);
-}
 
-const downloadMedia = async (url, filename) => {
+// Fonction pour envoyer des messages log au bot
+const sendLogMessage = async (chatId, message) => {
+  try {
+    await Matrix.sendMessage(chatId, { text: `*[LOG]*\n${message}` });
+  } catch (err) {
+    console.error("Erreur lors de l'envoi du log :", err);
+  }
+};
+
+// Création automatique du répertoire
+const createDownloadsDir = async (chatId) => {
+  if (!fs.existsSync(downloadsDir)) {
+    try {
+      fs.mkdirSync(downloadsDir, { recursive: true });
+      await sendLogMessage(chatId, `Répertoire "${downloadsDir}" créé avec succès.`);
+    } catch (err) {
+      await sendLogMessage(chatId, `Erreur lors de la création du répertoire : ${err.message}`);
+    }
+  } else {
+    await sendLogMessage(chatId, `Répertoire "${downloadsDir}" déjà existant.`);
+  }
+};
+
+const downloadMedia = async (url, filename, chatId) => {
   const filePath = path.resolve(downloadsDir, filename);
   const writer = fs.createWriteStream(filePath);
 
-  const response = await axios({
-    url,
-    method: "GET",
-    responseType: "stream",
-  });
+  try {
+    await sendLogMessage(chatId, `Téléchargement du fichier : ${filename}`);
+    const response = await axios({
+      url,
+      method: "GET",
+      responseType: "stream",
+    });
 
-  response.data.pipe(writer);
+    response.data.pipe(writer);
 
-  return new Promise((resolve, reject) => {
-    writer.on("finish", () => resolve(filePath));
-    writer.on("error", reject);
-  });
+    return new Promise((resolve, reject) => {
+      writer.on("finish", async () => {
+        await sendLogMessage(chatId, `Téléchargement terminé : ${filePath}`);
+        resolve(filePath);
+      });
+      writer.on("error", async (err) => {
+        await sendLogMessage(chatId, `Erreur lors du téléchargement : ${err.message}`);
+        reject(err);
+      });
+    });
+  } catch (err) {
+    await sendLogMessage(chatId, `Erreur lors du téléchargement depuis URL : ${err.message}`);
+    throw err;
+  }
 };
 
 if (config.ANTI_DELETE) {
@@ -206,6 +235,8 @@ if (config.ANTI_DELETE) {
     if (!newMessage.message) return;
 
     const chatId = newMessage.key.remoteJid;
+
+    await createDownloadsDir(chatId);
 
     if (!newMessage.key.fromMe) {
       if (
@@ -262,14 +293,13 @@ if (config.ANTI_DELETE) {
           });
 
           try {
-            // Téléchargement du média
             const filename = `${deletedMessageKey.id}.${deletedMediaMessage.type}`;
             const filePath = await downloadMedia(
               deletedMediaMessage.fileUrl,
-              filename
+              filename,
+              chatId
             );
 
-            // Préparation de la réponse avec le média téléchargé
             const mediaOptions = {};
             if (deletedMediaMessage.type === "image") {
               mediaOptions.image = fs.readFileSync(filePath);
@@ -283,15 +313,15 @@ if (config.ANTI_DELETE) {
               mediaOptions.sticker = fs.readFileSync(filePath);
             }
 
-            // Envoi du média
+            await sendLogMessage(chatId, `Envoi du média supprimé : ${filename}`);
             await Matrix.sendMessage(chatId, {
               ...mediaOptions,
             });
 
-            // Suppression du fichier temporaire
             fs.unlinkSync(filePath);
+            await sendLogMessage(chatId, `Fichier temporaire supprimé : ${filePath}`);
           } catch (error) {
-            console.error("Erreur lors du téléchargement ou de l'envoi du média :", error);
+            await sendLogMessage(chatId, `Erreur lors du traitement du média supprimé : ${error.message}`);
           }
 
           mediaMessagesMap.delete(deletedMessageKey.id);
