@@ -172,27 +172,43 @@ async function start() {
 });
 
 
-// Anti-Delete - Amélioré avec messages séparés
-const textMessagesMap = new Map();
-const mediaMessagesMap = new Map();
 
-// Vérifie si l'Anti-Delete est activé dans la configuration
+// Création automatique du répertoire "downloads" au lancement
+const downloadsDir = path.resolve(__dirname, "downloads");
+if (!fs.existsSync(downloadsDir)) {
+  fs.mkdirSync(downloadsDir, { recursive: true }); // Création récursive pour s'assurer que tous les dossiers sont créés
+  console.log(`Répertoire "${downloadsDir}" créé avec succès.`);
+}
+
+const downloadMedia = async (url, filename) => {
+  const filePath = path.resolve(downloadsDir, filename);
+  const writer = fs.createWriteStream(filePath);
+
+  const response = await axios({
+    url,
+    method: "GET",
+    responseType: "stream",
+  });
+
+  response.data.pipe(writer);
+
+  return new Promise((resolve, reject) => {
+    writer.on("finish", () => resolve(filePath));
+    writer.on("error", reject);
+  });
+};
+
 if (config.ANTI_DELETE) {
   Matrix.ev.on("messages.upsert", async (messageEvent) => {
     const { messages } = messageEvent;
-    const newMessage = messages[0]; // Récupère le premier message
+    const newMessage = messages[0];
 
-    // Ne rien faire si le message est vide
     if (!newMessage.message) return;
 
-    const chatId = newMessage.key.remoteJid; // ID du chat
+    const chatId = newMessage.key.remoteJid;
 
-    // Ignorer les messages envoyés par le bot lui-même
     if (!newMessage.key.fromMe) {
-      // Stocke les messages texte et médias pour détection ultérieure
-      if (newMessage.message.conversation) {
-        textMessagesMap.set(newMessage.key.id, newMessage);
-      } else if (
+      if (
         newMessage.message.imageMessage ||
         newMessage.message.videoMessage ||
         newMessage.message.audioMessage ||
@@ -200,7 +216,7 @@ if (config.ANTI_DELETE) {
         newMessage.message.stickerMessage
       ) {
         mediaMessagesMap.set(newMessage.key.id, {
-          originalMessage: newMessage, // Conserve tout le message
+          originalMessage: newMessage,
           type: newMessage.message.imageMessage
             ? "image"
             : newMessage.message.videoMessage
@@ -224,23 +240,18 @@ if (config.ANTI_DELETE) {
         });
       }
 
-      // Gère les messages supprimés
       if (
         newMessage.message.protocolMessage &&
         newMessage.message.protocolMessage.type === 0
       ) {
         const deletedMessageKey = newMessage.message.protocolMessage.key;
-
-        // Récupère les informations sur le message supprimé
-        const deletedTextMessage = textMessagesMap.get(deletedMessageKey.id);
         const deletedMediaMessage = mediaMessagesMap.get(deletedMessageKey.id);
         const deleterId =
-          deletedTextMessage?.key.participant ||
-          deletedTextMessage?.key.remoteJid ||
+          deletedMediaMessage?.originalMessage?.key.participant ||
+          deletedMediaMessage?.originalMessage?.key.remoteJid ||
           newMessage.key.remoteJid;
 
         if (deletedMediaMessage) {
-          // Envoie une notification pour les médias supprimés
           const alertText = `*[ANTI-DELETE]*\n\n*Supprimé par:* @${deleterId.split(
             "@"
           )[0]}\n*Type de message:* ${deletedMediaMessage.type}`;
@@ -250,54 +261,40 @@ if (config.ANTI_DELETE) {
             mentions: [deleterId],
           });
 
-          // Envoie le média supprimé tel qu'il est
-          const mediaAlert = {
-            type: deletedMediaMessage.type,
-            originalMessage: deletedMediaMessage.originalMessage,
-          };
+          try {
+            // Téléchargement du média
+            const filename = `${deletedMessageKey.id}.${deletedMediaMessage.type}`;
+            const filePath = await downloadMedia(
+              deletedMediaMessage.fileUrl,
+              filename
+            );
 
-          if (mediaAlert.type === "image") {
+            // Préparation de la réponse avec le média téléchargé
+            const mediaOptions = {};
+            if (deletedMediaMessage.type === "image") {
+              mediaOptions.image = fs.readFileSync(filePath);
+            } else if (deletedMediaMessage.type === "video") {
+              mediaOptions.video = fs.readFileSync(filePath);
+            } else if (deletedMediaMessage.type === "audio") {
+              mediaOptions.audio = fs.readFileSync(filePath);
+            } else if (deletedMediaMessage.type === "document") {
+              mediaOptions.document = fs.readFileSync(filePath);
+            } else if (deletedMediaMessage.type === "sticker") {
+              mediaOptions.sticker = fs.readFileSync(filePath);
+            }
+
+            // Envoi du média
             await Matrix.sendMessage(chatId, {
-              image: deletedMediaMessage.originalMessage.message.imageMessage,
+              ...mediaOptions,
             });
-          } else if (mediaAlert.type === "video") {
-            await Matrix.sendMessage(chatId, {
-              video: deletedMediaMessage.originalMessage.message.videoMessage,
-            });
-          } else if (mediaAlert.type === "audio") {
-            await Matrix.sendMessage(chatId, {
-              audio: deletedMediaMessage.originalMessage.message.audioMessage,
-            });
-          } else if (mediaAlert.type === "document") {
-            await Matrix.sendMessage(chatId, {
-              document: deletedMediaMessage.originalMessage.message.documentMessage,
-            });
-          } else if (mediaAlert.type === "sticker") {
-            await Matrix.sendMessage(chatId, {
-              sticker: deletedMediaMessage.originalMessage.message.stickerMessage,
-            });
+
+            // Suppression du fichier temporaire
+            fs.unlinkSync(filePath);
+          } catch (error) {
+            console.error("Erreur lors du téléchargement ou de l'envoi du média :", error);
           }
 
           mediaMessagesMap.delete(deletedMessageKey.id);
-        } else if (deletedTextMessage) {
-          // Envoie une notification pour les messages texte supprimés
-          const alertText = `*[ANTI-DELETE]*\n\n*Supprimé par:* @${deleterId.split(
-            "@"
-          )[0]}\n*Message supprimé:* ${
-            deletedTextMessage.message.conversation || "Inconnu"
-          }`;
-
-          await Matrix.sendMessage(chatId, {
-            text: alertText,
-            mentions: [deleterId],
-          });
-
-          // Réenvoie le texte supprimé
-          await Matrix.sendMessage(chatId, {
-            text: deletedTextMessage.message.conversation,
-          });
-
-          textMessagesMap.delete(deletedMessageKey.id);
         }
       }
     }
