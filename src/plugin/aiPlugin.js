@@ -28,27 +28,16 @@ async function writeChatHistoryToFile(chatHistory) {
     }
 }
 
-async function updateChatHistory(chatHistory, sender, message) {
-    if (!chatHistory[sender]) {
-        chatHistory[sender] = [];
-    }
-    chatHistory[sender].push(message);
-    if (chatHistory[sender].length > 20) {
-        chatHistory[sender].shift();
-    }
-    await writeChatHistoryToFile(chatHistory);
-}
-
 async function deleteChatHistory(chatHistory, userId) {
     delete chatHistory[userId];
     await writeChatHistoryToFile(chatHistory);
 }
 
 const aiPlugin = async (m, Matrix) => {
-    const chatHistory = await readChatHistoryFromFile();
     const text = m.body.toLowerCase();
 
     if (text === "/forget") {
+        const chatHistory = await readChatHistoryFromFile();
         await deleteChatHistory(chatHistory, m.sender);
         await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
         return;
@@ -56,7 +45,7 @@ const aiPlugin = async (m, Matrix) => {
 
     const prefix = config.PREFIX;
 
-    const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)`, 'i');
+    const commandRegex = new RegExp(`^${prefix}\s*(\S+)`, 'i');
     const match = m.body.match(commandRegex);
 
     const cmd = match ? match[1].toLowerCase() : '';
@@ -71,10 +60,8 @@ const aiPlugin = async (m, Matrix) => {
         }
 
         try {
-            const senderChatHistory = chatHistory[m.sender] || [];
             const messages = [
                 { role: "system", content: aiSystemPrompt },
-                ...senderChatHistory,
                 { role: "user", content: prompt }
             ];
 
@@ -98,9 +85,6 @@ const aiPlugin = async (m, Matrix) => {
 
             const responseData = await response.json();
             const answer = responseData[0].generated_text || "Sorry, I couldn't generate a response.";
-
-            await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
-            await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
 
             await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
             await m.React("✅");
