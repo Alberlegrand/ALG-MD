@@ -28,18 +28,46 @@ async function writeChatHistoryToFile(chatHistory) {
     }
 }
 
+async function updateChatHistory(chatHistory, sender, message) {
+    if (!chatHistory[sender]) {
+        chatHistory[sender] = [];
+    }
+    chatHistory[sender].push(message);
+    if (chatHistory[sender].length > 50) {
+        chatHistory[sender].shift();
+    }
+    await writeChatHistoryToFile(chatHistory);
+}
+
 async function deleteChatHistory(chatHistory, userId) {
     delete chatHistory[userId];
     await writeChatHistoryToFile(chatHistory);
 }
 
+async function formatChatHistory(chatHistory) {
+    return chatHistory.map(entry => {
+        return `[${entry.role.toUpperCase()}]: ${entry.content}`;
+    }).join('\n');
+}
+
 const aiPlugin = async (m, Matrix) => {
+    const chatHistory = await readChatHistoryFromFile();
     const text = m.body.toLowerCase();
 
     if (text === "/forget") {
-        const chatHistory = await readChatHistoryFromFile();
         await deleteChatHistory(chatHistory, m.sender);
         await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
+        return;
+    }
+
+    if (text === "/history") {
+        const senderChatHistory = chatHistory[m.sender] || [];
+        if (senderChatHistory.length === 0) {
+            await Matrix.sendMessage(m.from, { text: 'No conversation history found.' }, { quoted: m });
+        } else {
+            const formattedHistory = await formatChatHistory(senderChatHistory);
+            await Matrix.sendMessage(m.from, { text: `Your Chat History:\n\n${formattedHistory}` }, { quoted: m });
+        }
         return;
     }
 
@@ -60,11 +88,6 @@ const aiPlugin = async (m, Matrix) => {
         }
 
         try {
-            const messages = [
-                { role: "system", content: aiSystemPrompt },
-                { role: "user", content: prompt }
-            ];
-
             await m.React("🤖");
 
             // Utiliser Hugging Face API
@@ -75,7 +98,7 @@ const aiPlugin = async (m, Matrix) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    inputs: messages.map(msg => msg.content).join('\n'),
+                    inputs: `${aiSystemPrompt}\nUser: ${prompt}`,
                 })
             });
 
@@ -84,7 +107,10 @@ const aiPlugin = async (m, Matrix) => {
             }
 
             const responseData = await response.json();
-            const answer = responseData[0].generated_text || "Sorry, I couldn't generate a response.";
+            const answer = responseData[0]?.generated_text || "Sorry, I couldn't generate a response.";
+
+            await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
+            await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
 
             await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
             await m.React("✅");
