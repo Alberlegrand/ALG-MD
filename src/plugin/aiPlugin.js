@@ -90,15 +90,19 @@ const aiPlugin = async (m, Matrix) => {
         try {
             await m.React("🤖");
 
-            // Utiliser Hugging Face API
-            const response = await fetch('https://api-inference.huggingface.co/models/distilgpt2', {
+            // Utiliser Meta LLaMA 3.3 70B-Instruct via Hugging Face
+            const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer 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`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    inputs: `${aiSystemPrompt}\nUser: ${prompt}`,
+                    inputs: prompt,
+                    parameters: {
+                        temperature: 0.7,
+                        max_new_tokens: 200
+                    }
                 })
             });
 
@@ -107,7 +111,7 @@ const aiPlugin = async (m, Matrix) => {
             }
 
             const responseData = await response.json();
-            const answer = responseData[0]?.generated_text || "Sorry, I couldn't generate a response.";
+            const answer = responseData.generated_text || "Sorry, I couldn't generate a response.";
 
             await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
             await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
