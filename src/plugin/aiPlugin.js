@@ -63,6 +63,8 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
         { role: "user", content: prompt }
     ];
 
+    console.log("Prompt envoyé :", messages.map(msg => msg.content).join('\n')); // Debugging
+
     try {
         const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
             method: 'POST',
@@ -77,6 +79,12 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
         });
 
         const responseData = await response.json();
+
+        if (response.status !== 200) {
+            console.error('Erreur API Hugging Face :', responseData);
+            throw new Error('Erreur API Hugging Face');
+        }
+
         const answer = responseData[0]?.generated_text || "Sorry, I couldn't generate a response.";
 
         // Enrichir l'historique avec la nouvelle interaction
