@@ -41,25 +41,9 @@ async function enrichTraining(chatHistory, sender, newMessage) {
     await writeChatHistoryToFile(chatHistory);
 }
 
-// Fonction pour supprimer l'historique d'un utilisateur
-async function deleteChatHistory(chatHistory, sender) {
-    delete chatHistory[sender];
-    await writeChatHistoryToFile(chatHistory);
-}
-
 // Fonction pour formater l'historique des conversations
 async function formatChatHistory(history) {
     return history.map(entry => `${entry.role}: ${entry.content}`).join('\n');
-}
-
-// Fonction principale pour entraîner le modèle
-async function trainModel(chatHistory, userMessage) {
-    const trainingData = chatHistory.map(entry => ({
-        role: entry.role,
-        content: entry.content,
-    }));
-    trainingData.push({ role: "user", content: userMessage });
-    return trainingData;
 }
 
 // Fonction pour répondre automatiquement
@@ -83,7 +67,7 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
         const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer hf_your_api_key`,
+                'Authorization': `Bearer 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`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -110,24 +94,7 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
 const aiPlugin = async (m, Matrix) => {
     const chatHistory = await readChatHistoryFromFile();
 
-    if (m.body === "/forget") {
-        await deleteChatHistory(chatHistory, m.sender);
-        await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
-        return;
-    }
-
-    if (m.body === "/history") {
-        const senderChatHistory = chatHistory[m.sender] || [];
-        if (senderChatHistory.length === 0) {
-            await Matrix.sendMessage(m.from, { text: 'No conversation history found.' }, { quoted: m });
-        } else {
-            const formattedHistory = await formatChatHistory(senderChatHistory);
-            await Matrix.sendMessage(m.from, { text: `Your Chat History:\n\n${formattedHistory}` }, { quoted: m });
-        }
-        return;
-    }
-
-    // Répondre automatiquement
+    // Répondre automatiquement à tous les messages
     await autoRespond(m, chatHistory, Matrix);
 };
 
