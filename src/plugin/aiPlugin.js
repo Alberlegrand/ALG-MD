@@ -1,21 +1,25 @@
-import fs from 'fs';
+import { promises as fs } from 'fs';
+import path from 'path';
 import fetch from 'node-fetch';
+import pkg from '@whiskeysockets/baileys';
+const { generateWAMessageFromContent, proto } = pkg;
 
-const chatHistoryFile = './chatHistory.json';
 const HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill";
 const HUGGING_FACE_API_KEY = "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";
 const OWNER_ID = '50944727644@s.whatsapp.net'; // ID de l'utilisateur principal
 
+const __filename = new URL(import.meta.url).pathname;
+const __dirname = path.dirname(__filename);
+const chatHistoryFile = path.resolve(__dirname, '../chatHistory.json');
+
+const systemPrompt = "you are a helpful assistant.";
+
 // Fonction pour lire l'historique des chats
 async function readChatHistoryFromFile() {
     try {
-        if (fs.existsSync(chatHistoryFile)) {
-            const data = fs.readFileSync(chatHistoryFile, 'utf8');
-            return JSON.parse(data);
-        }
-        return {};
-    } catch (error) {
-        console.error('Error reading chat history:', error);
+        const data = await fs.readFile(chatHistoryFile, "utf-8");
+        return JSON.parse(data);
+    } catch (err) {
         return {};
     }
 }
@@ -23,82 +27,118 @@ async function readChatHistoryFromFile() {
 // Fonction pour écrire l'historique des chats
 async function writeChatHistoryToFile(chatHistory) {
     try {
-        fs.writeFileSync(chatHistoryFile, JSON.stringify(chatHistory, null, 2), 'utf8');
-    } catch (error) {
-        console.error('Error writing chat history:', error);
+        await fs.writeFile(chatHistoryFile, JSON.stringify(chatHistory, null, 2));
+    } catch (err) {
+        console.error('Error writing chat history to file:', err);
     }
 }
 
-// Fonction pour enrichir l'historique des conversations
-async function enrichTraining(chatHistory, sender, newMessage) {
+// Fonction pour mettre à jour l'historique des chats
+async function updateChatHistory(chatHistory, sender, message) {
     if (!chatHistory[sender]) {
         chatHistory[sender] = [];
     }
-    chatHistory[sender].push(newMessage);
-
-    if (chatHistory[sender].length > 100) {
+    chatHistory[sender].push(message);
+    if (chatHistory[sender].length > 20) {
         chatHistory[sender].shift();
     }
-
     await writeChatHistoryToFile(chatHistory);
 }
 
-// Fonction pour vérifier si un message est envoyé par un bot
-function isMessageFromBot(sender) {
-    return (
-        sender.includes('@g.us') || 
-        sender.includes('@broadcast') || 
-        sender.includes('@newsletter') || 
-        sender.includes('@bot')
-    );
-}
-
-async function autoRespond(m, chatHistory, Matrix, ownerId) {
-    if (m.sender === ownerId) {
-        console.log(`Message ignored from bot or owner: ${m.sender}`);
-        return;
-    }
-
-    const senderChatHistory = chatHistory[m.sender] || [];
-    const prompt = m.body;
-
-    try {
-        const response = await fetch(HUGGING_FACE_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ inputs: prompt })
-        });
-
-        if (!response.ok) {
-            const errorDetails = await response.json();
-            console.error('Hugging Face API error details:', errorDetails);
-            throw new Error(`Hugging Face API Error: ${response.status} - ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
-        console.log('Hugging Face API Response:', responseData);
-
-        const answer = responseData?.generated_text;
-
-        await enrichTraining(chatHistory, m.sender, { role: "assistant", content: answer });
-
-        await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
-    } catch (err) {
-        console.error('Error in autoRespond:', err);
-        await Matrix.sendMessage(m.from, { text: "Une erreur s'est produite lors du traitement de votre demande." }, { quoted: m });
-    }
+// Fonction pour supprimer l'historique des chats
+async function deleteChatHistory(chatHistory, userId) {
+    delete chatHistory[userId];
+    await writeChatHistoryToFile(chatHistory);
 }
 
 const aiPlugin = async (m, Matrix) => {
     const chatHistory = await readChatHistoryFromFile();
+    const text = m.body.toLowerCase();
 
-    try {
-        await autoRespond(m, chatHistory, Matrix, OWNER_ID);
-    } catch (err) {
-        console.error('Error in aiPlugin:', err);
+    if (text === "/forget") {
+        await deleteChatHistory(chatHistory, m.sender);
+        await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
+        return;
+    }
+
+    const prefix = '/'; // Préfixe pour les commandes
+
+    const commandRegex = new RegExp(`^${prefix}\s*(\S+)`, 'i');
+    const match = m.body.match(commandRegex);
+
+    const cmd = match ? match[1].toLowerCase() : '';
+    const prompt = match ? m.body.slice(match[0].length).trim() : '';
+
+    const validCommands = ['bf', 'al', 'jean'];
+
+    if (validCommands.includes(cmd)) {
+        if (!prompt) {
+            await Matrix.sendMessage(m.from, { text: 'Please provide a prompt.' }, { quoted: m });
+            return;
+        }
+
+        try {
+            const senderChatHistory = chatHistory[m.sender] || [];
+            const messages = [
+                { role: "system", content: systemPrompt },
+                ...senderChatHistory,
+                { role: "user", content: prompt }
+            ];
+
+            await m.React("🧠");
+
+            const response = await fetch(HUGGING_FACE_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ inputs: prompt })
+            });
+
+            if (!response.ok) {
+                const errorDetails = await response.json();
+                console.error('Hugging Face API error details:', errorDetails);
+                throw new Error(`Hugging Face API Error: ${response.status} - ${response.statusText}`);
+            }
+
+            const responseData = await response.json();
+            const answer = responseData?.generated_text || "Sorry, I couldn't generate a valid response.";
+
+            await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
+            await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
+
+            const codeMatch = answer.match(/```([\s\S]*?)```/);
+
+            if (codeMatch) {
+                const code = codeMatch[1];
+
+                const msg = generateWAMessageFromContent(m.from, {
+                    viewOnceMessage: {
+                        message: {
+                            messageContextInfo: {},
+                            interactiveMessage: proto.Message.InteractiveMessage.create({
+                                body: proto.Message.InteractiveMessage.Body.create({ text: answer }),
+                                footer: proto.Message.InteractiveMessage.Footer.create({ text: "> Powered by ALG-MD" }),
+                                header: proto.Message.InteractiveMessage.Header.create({ title: "", subtitle: "" })
+                            })
+                        }
+                    }
+                }, {});
+
+                await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
+                    messageId: msg.key.id
+                });
+            } else {
+                await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
+            }
+
+            await m.React("✅");
+        } catch (err) {
+            await Matrix.sendMessage(m.from, { text: "An error occurred while processing your request." }, { quoted: m });
+            console.error('Error: ', err);
+            await m.React("❌");
+        }
     }
 };
 
