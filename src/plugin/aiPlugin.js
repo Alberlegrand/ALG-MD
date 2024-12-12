@@ -1,5 +1,5 @@
-const fs = require('fs');
-const fetch = require('node-fetch');
+import fs from 'fs';
+import fetch from 'node-fetch';
 
 const chatHistoryFile = './chatHistory.json'; // Fichier pour stocker l'historique des conversations
 
@@ -98,4 +98,4 @@ const aiPlugin = async (m, Matrix) => {
     await autoRespond(m, chatHistory, Matrix);
 };
 
-module.exports = aiPlugin;
+export default aiPlugin;
