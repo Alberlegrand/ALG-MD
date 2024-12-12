@@ -1,66 +1,122 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import fetch from 'node-fetch';
-import pkg from '@whiskeysockets/baileys';
-const { generateWAMessageFromContent, proto } = pkg;
-import config from '../../config.cjs';
+const fs = require('fs');
+const fetch = require('node-fetch');
 
-const __filename = new URL(import.meta.url).pathname;
-const __dirname = path.dirname(__filename);
-const chatHistoryFile = path.resolve(__dirname, '../ai_chat_history.json');
+const chatHistoryFile = './chatHistory.json'; // Fichier pour stocker l'historique des conversations
 
-const aiSystemPrompt = "You are a helpful assistant for various inquiries.";
-
+// Fonction pour lire l'historique des chats
 async function readChatHistoryFromFile() {
     try {
-        const data = await fs.readFile(chatHistoryFile, "utf-8");
-        return JSON.parse(data);
-    } catch (err) {
+        if (fs.existsSync(chatHistoryFile)) {
+            const data = fs.readFileSync(chatHistoryFile, 'utf8');
+            return JSON.parse(data);
+        }
+        return {};
+    } catch (error) {
+        console.error('Error reading chat history:', error);
         return {};
     }
 }
 
+// Fonction pour écrire l'historique des chats dans un fichier
 async function writeChatHistoryToFile(chatHistory) {
     try {
-        await fs.writeFile(chatHistoryFile, JSON.stringify(chatHistory, null, 2));
-    } catch (err) {
-        console.error('Error writing chat history to file:', err);
+        fs.writeFileSync(chatHistoryFile, JSON.stringify(chatHistory, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Error writing chat history:', error);
     }
 }
 
-async function updateChatHistory(chatHistory, sender, message) {
+// Fonction pour enrichir l'historique des conversations
+async function enrichTraining(chatHistory, sender, newMessage) {
     if (!chatHistory[sender]) {
         chatHistory[sender] = [];
     }
-    chatHistory[sender].push(message);
-    if (chatHistory[sender].length > 50) {
+    chatHistory[sender].push(newMessage);
+
+    // Limiter l'historique à 100 messages par utilisateur
+    if (chatHistory[sender].length > 100) {
         chatHistory[sender].shift();
     }
+
     await writeChatHistoryToFile(chatHistory);
 }
 
-async function deleteChatHistory(chatHistory, userId) {
-    delete chatHistory[userId];
+// Fonction pour supprimer l'historique d'un utilisateur
+async function deleteChatHistory(chatHistory, sender) {
+    delete chatHistory[sender];
     await writeChatHistoryToFile(chatHistory);
 }
 
-async function formatChatHistory(chatHistory) {
-    return chatHistory.map(entry => {
-        return `[${entry.role.toUpperCase()}]: ${entry.content}`;
-    }).join('\n');
+// Fonction pour formater l'historique des conversations
+async function formatChatHistory(history) {
+    return history.map(entry => `${entry.role}: ${entry.content}`).join('\n');
 }
 
+// Fonction principale pour entraîner le modèle
+async function trainModel(chatHistory, userMessage) {
+    const trainingData = chatHistory.map(entry => ({
+        role: entry.role,
+        content: entry.content,
+    }));
+    trainingData.push({ role: "user", content: userMessage });
+    return trainingData;
+}
+
+// Fonction pour répondre automatiquement
+async function autoRespond(m, chatHistory, Matrix) {
+    const aiSystemPrompt = `
+You are acting as [USER]. Respond with a tone and style matching previous interactions. 
+Make the responses helpful, concise, and in line with [USER]'s conversation history.
+`;
+
+    const senderChatHistory = chatHistory[m.sender] || [];
+    const prompt = m.body;
+
+    // Construire la requête avec l'historique enrichi
+    const messages = [
+        { role: "system", content: aiSystemPrompt },
+        ...senderChatHistory,
+        { role: "user", content: prompt }
+    ];
+
+    try {
+        const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer hf_your_api_key`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                inputs: messages.map(msg => msg.content).join('\n'),
+                parameters: { max_length: 500 }
+            })
+        });
+
+        const responseData = await response.json();
+        const answer = responseData[0]?.generated_text || "Sorry, I couldn't generate a response.";
+
+        // Enrichir l'historique avec la nouvelle interaction
+        await enrichTraining(chatHistory, m.sender, { role: "assistant", content: answer });
+
+        // Envoyer la réponse
+        await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
+    } catch (err) {
+        console.error('Error in autoRespond:', err);
+        await Matrix.sendMessage(m.from, { text: "An error occurred while processing your request." }, { quoted: m });
+    }
+}
+
+// Fonction principale du plugin
 const aiPlugin = async (m, Matrix) => {
     const chatHistory = await readChatHistoryFromFile();
-    const text = m.body.toLowerCase();
 
-    if (text === "/forget") {
+    if (m.body === "/forget") {
         await deleteChatHistory(chatHistory, m.sender);
         await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
         return;
     }
 
-    if (text === "/history") {
+    if (m.body === "/history") {
         const senderChatHistory = chatHistory[m.sender] || [];
         if (senderChatHistory.length === 0) {
             await Matrix.sendMessage(m.from, { text: 'No conversation history found.' }, { quoted: m });
@@ -71,59 +127,8 @@ const aiPlugin = async (m, Matrix) => {
         return;
     }
 
-    const prefix = config.PREFIX;
-
-    const commandRegex = new RegExp(`^${prefix}\s*(\S+)`, 'i');
-    const match = m.body.match(commandRegex);
-
-    const cmd = match ? match[1].toLowerCase() : '';
-    const prompt = match ? m.body.slice(match[0].length).trim() : '';
-
-    const validCommands = ['ai', 'gpt', 'chat', 'ask'];
-
-    if (validCommands.includes(cmd)) {
-        if (!prompt) {
-            await Matrix.sendMessage(m.from, { text: 'Please provide a prompt.' }, { quoted: m });
-            return;
-        }
-
-        try {
-            await m.React("🤖");
-
-            // Utiliser Meta LLaMA 3.3 70B-Instruct via Hugging Face
-            const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer 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`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    inputs: prompt,
-                    parameters: {
-                        temperature: 0.7,
-                        max_new_tokens: 200
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const responseData = await response.json();
-            const answer = responseData.generated_text || "Sorry, I couldn't generate a response.";
-
-            await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
-            await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
-
-            await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
-            await m.React("✅");
-        } catch (err) {
-            await Matrix.sendMessage(m.from, { text: "An error occurred while processing your request." }, { quoted: m });
-            console.error('Error: ', err);
-            await m.React("❌");
-        }
-    }
+    // Répondre automatiquement
+    await autoRespond(m, chatHistory, Matrix);
 };
 
-export default aiPlugin;
+module.exports = aiPlugin;
