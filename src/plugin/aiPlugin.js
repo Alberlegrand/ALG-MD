@@ -1,9 +1,10 @@
 import fs from 'fs';
 import fetch from 'node-fetch';
 
-const chatHistoryFile = './chatHistory.json'; // Fichier pour stocker l'historique des conversations
+const chatHistoryFile = './chatHistory.json';
 const HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill";
-const HUGGING_FACE_API_KEY = "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"; // Remplacez par une clé d'API valide
+const HUGGING_FACE_API_KEY = "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";
+const OWNER_ID = '50944727644@s.whatsapp.net'; // ID de l'utilisateur principal
 
 // Fonction pour lire l'historique des chats
 async function readChatHistoryFromFile() {
@@ -19,7 +20,7 @@ async function readChatHistoryFromFile() {
     }
 }
 
-// Fonction pour écrire l'historique des chats dans un fichier
+// Fonction pour écrire l'historique des chats
 async function writeChatHistoryToFile(chatHistory) {
     try {
         fs.writeFileSync(chatHistoryFile, JSON.stringify(chatHistory, null, 2), 'utf8');
@@ -35,7 +36,6 @@ async function enrichTraining(chatHistory, sender, newMessage) {
     }
     chatHistory[sender].push(newMessage);
 
-    // Limiter l'historique à 100 messages par utilisateur
     if (chatHistory[sender].length > 100) {
         chatHistory[sender].shift();
     }
@@ -45,30 +45,31 @@ async function enrichTraining(chatHistory, sender, newMessage) {
 
 // Fonction pour vérifier si un message est envoyé par un bot
 function isMessageFromBot(sender) {
-    return sender.includes('bot') || sender.includes('Bot') || sender.includes('BOT');
+    return (
+        sender.includes('@g.us') || 
+        sender.includes('@broadcast') || 
+        sender.includes('@newsletter') || 
+        sender.includes('@bot')
+    );
 }
 
-// Fonction pour répondre automatiquement
-async function autoRespond(m, chatHistory, Matrix) {
-    if (isMessageFromBot(m.sender)) {
-        console.log(`Message ignored from bot sender: ${m.sender}`);
-        return; // Ignorer les messages envoyés par des bots
+async function autoRespond(m, chatHistory, Matrix, ownerId) {
+    if (m.sender === ownerId) {
+        console.log(`Message ignored from bot or owner: ${m.sender}`);
+        return;
     }
 
     const senderChatHistory = chatHistory[m.sender] || [];
     const prompt = m.body;
 
     try {
-        // Construire la requête pour Hugging Face
         const response = await fetch(HUGGING_FACE_API_URL, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                inputs: prompt
-            })
+            body: JSON.stringify({ inputs: prompt })
         });
 
         if (!response.ok) {
@@ -78,12 +79,12 @@ async function autoRespond(m, chatHistory, Matrix) {
         }
 
         const responseData = await response.json();
-        const answer = responseData.generated_text || "Désolé, je n'ai pas pu générer de réponse.";
+        console.log('Hugging Face API Response:', responseData);
 
-        // Enrichir l'historique avec la nouvelle interaction
+        const answer = responseData?.generated_text || "Désolé, je n'ai pas pu générer de réponse valide.";
+
         await enrichTraining(chatHistory, m.sender, { role: "assistant", content: answer });
 
-        // Envoyer la réponse
         await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
     } catch (err) {
         console.error('Error in autoRespond:', err);
@@ -91,13 +92,11 @@ async function autoRespond(m, chatHistory, Matrix) {
     }
 }
 
-// Fonction principale du plugin
 const aiPlugin = async (m, Matrix) => {
     const chatHistory = await readChatHistoryFromFile();
 
     try {
-        // Répondre automatiquement à tous les messages
-        await autoRespond(m, chatHistory, Matrix);
+        await autoRespond(m, chatHistory, Matrix, OWNER_ID);
     } catch (err) {
         console.error('Error in aiPlugin:', err);
     }
