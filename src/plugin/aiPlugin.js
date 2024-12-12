@@ -69,7 +69,7 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
         const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer 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`,
+                'Authorization': `Bearer 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`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
