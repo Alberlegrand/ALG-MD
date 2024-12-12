@@ -2,6 +2,7 @@ import fs from 'fs';
 import fetch from 'node-fetch';
 
 const chatHistoryFile = './chatHistory.json'; // Fichier pour stocker l'historique des conversations
+const cohereApiKey = "Dqd4ydlUAKG5wSrXYySxdrNZNDsFEr5kFfcIjtf2"; // Clé API Cohere
 
 // Fonction pour lire l'historique des chats
 async function readChatHistoryFromFile() {
@@ -41,9 +42,38 @@ async function enrichTraining(chatHistory, sender, newMessage) {
     await writeChatHistoryToFile(chatHistory);
 }
 
-// Fonction pour formater l'historique des conversations
-async function formatChatHistory(history) {
-    return history.map(entry => `${entry.role}: ${entry.content}`).join('\n');
+// Fonction pour répondre automatiquement avec Cohere
+async function queryCohere(prompt) {
+    try {
+        const response = await fetch('https://api.cohere.ai/generate', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${cohereApiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'command-xlarge-nightly',
+                prompt: prompt,
+                max_tokens: 500,
+                temperature: 0.7,
+                k: 0,
+                p: 1,
+                stop_sequences: []
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.status !== 200) {
+            console.error('Erreur API Cohere :', data);
+            throw new Error('Erreur API Cohere');
+        }
+
+        return data.generations[0].text.trim();
+    } catch (error) {
+        console.error('Error querying Cohere:', error);
+        throw error;
+    }
 }
 
 // Fonction pour répondre automatiquement
@@ -63,29 +93,12 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
         { role: "user", content: prompt }
     ];
 
-    console.log("Prompt envoyé :", messages.map(msg => msg.content).join('\n')); // Debugging
+    const formattedPrompt = messages.map(msg => msg.content).join('\n');
+
+    console.log("Prompt envoyé :", formattedPrompt); // Debugging
 
     try {
-        const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer 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`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                inputs: messages.map(msg => msg.content).join('\n'),
-                parameters: { max_length: 500 }
-            })
-        });
-
-        const responseData = await response.json();
-
-        if (response.status !== 200) {
-            console.error('Erreur API Hugging Face :', responseData);
-            throw new Error('Erreur API Hugging Face');
-        }
-
-        const answer = responseData[0]?.generated_text || "Sorry, I couldn't generate a response.";
+        const answer = await queryCohere(formattedPrompt);
 
         // Enrichir l'historique avec la nouvelle interaction
         await enrichTraining(chatHistory, m.sender, { role: "assistant", content: answer });
