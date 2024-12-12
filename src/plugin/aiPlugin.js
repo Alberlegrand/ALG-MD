@@ -2,7 +2,8 @@ import fs from 'fs';
 import fetch from 'node-fetch';
 
 const chatHistoryFile = './chatHistory.json'; // Fichier pour stocker l'historique des conversations
-const OPENAI_API_KEY = "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";
+const HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill";
+const HUGGING_FACE_API_KEY = "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"; // Remplacez par une clé d'API valide
 
 // Fonction pour lire l'historique des chats
 async function readChatHistoryFromFile() {
@@ -42,45 +43,42 @@ async function enrichTraining(chatHistory, sender, newMessage) {
     await writeChatHistoryToFile(chatHistory);
 }
 
-// Fonction pour formater l'historique des conversations
-async function formatChatHistory(history) {
-    return history.map(entry => `${entry.role}: ${entry.content}`).join('\n');
+// Fonction pour vérifier si un message est envoyé par un bot
+function isMessageFromBot(sender) {
+    return sender.includes('bot') || sender.includes('Bot') || sender.includes('BOT');
 }
 
 // Fonction pour répondre automatiquement
 async function autoRespond(m, chatHistory, Matrix) {
-    const aiSystemPrompt = `
-You are acting as [USER]. Respond with a tone and style matching previous interactions. 
-Make the responses helpful, concise, and in line with [USER]'s conversation history.
-`;
+    if (isMessageFromBot(m.sender)) {
+        console.log(`Message ignored from bot sender: ${m.sender}`);
+        return; // Ignorer les messages envoyés par des bots
+    }
 
     const senderChatHistory = chatHistory[m.sender] || [];
     const prompt = m.body;
 
-    // Construire la requête avec l'historique enrichi
-    const messages = [
-        { role: "system", content: aiSystemPrompt },
-        ...senderChatHistory,
-        { role: "user", content: prompt }
-    ];
-
     try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        // Construire la requête pour Hugging Face
+        const response = await fetch(HUGGING_FACE_API_URL, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: "gpt-4", // Utilisez le modèle GPT-4 ou GPT-3.5 selon vos besoins
-                messages: messages,
-                max_tokens: 500,
-                temperature: 0.7
+                inputs: prompt
             })
         });
 
+        if (!response.ok) {
+            const errorDetails = await response.json();
+            console.error('Hugging Face API error details:', errorDetails);
+            throw new Error(`Hugging Face API Error: ${response.status} - ${response.statusText}`);
+        }
+
         const responseData = await response.json();
-        const answer = responseData.choices[0]?.message?.content || "Sorry, I couldn't generate a response.";
+        const answer = responseData.generated_text || "Désolé, je n'ai pas pu générer de réponse.";
 
         // Enrichir l'historique avec la nouvelle interaction
         await enrichTraining(chatHistory, m.sender, { role: "assistant", content: answer });
@@ -89,7 +87,7 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
         await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
     } catch (err) {
         console.error('Error in autoRespond:', err);
-        await Matrix.sendMessage(m.from, { text: "An error occurred while processing your request." }, { quoted: m });
+        await Matrix.sendMessage(m.from, { text: "Une erreur s'est produite lors du traitement de votre demande." }, { quoted: m });
     }
 }
 
@@ -97,8 +95,12 @@ Make the responses helpful, concise, and in line with [USER]'s conversation hist
 const aiPlugin = async (m, Matrix) => {
     const chatHistory = await readChatHistoryFromFile();
 
-    // Répondre automatiquement à tous les messages
-    await autoRespond(m, chatHistory, Matrix);
+    try {
+        // Répondre automatiquement à tous les messages
+        await autoRespond(m, chatHistory, Matrix);
+    } catch (err) {
+        console.error('Error in aiPlugin:', err);
+    }
 };
 
 export default aiPlugin;
