@@ -81,7 +81,7 @@ async function autoRespond(m, chatHistory, Matrix, ownerId) {
         const responseData = await response.json();
         console.log('Hugging Face API Response:', responseData);
 
-        const answer = responseData?.generated_text || "Désolé, je n'ai pas pu générer de réponse valide.";
+        const answer = responseData?.generated_text;
 
         await enrichTraining(chatHistory, m.sender, { role: "assistant", content: answer });
 
