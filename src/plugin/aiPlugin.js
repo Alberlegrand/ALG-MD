@@ -5,7 +5,7 @@ import pkg from '@whiskeysockets/baileys';
 const { generateWAMessageFromContent, proto } = pkg;
 
 const HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill";
-const HUGGING_FACE_API_KEY = "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";
+const HUGGING_FACE_API_KEY = process.env.HUGGING_FACE_API_KEY; // Secure the API key using environment variables
 const OWNER_ID = '50944727644@s.whatsapp.net'; // ID de l'utilisateur principal
 
 const __filename = new URL(import.meta.url).pathname;
@@ -61,9 +61,9 @@ const aiPlugin = async (m, Matrix) => {
         return;
     }
 
-    const prefix = '/'; // Préfixe pour les commandes
+    const prefix = '.'; // Préfixe pour les commandes
 
-    const commandRegex = new RegExp(`^${prefix}\s*(\S+)`, 'i');
+    const commandRegex = new RegExp(`^${prefix}\\s*(\\S+)`, 'i');
     const match = m.body.match(commandRegex);
 
     const cmd = match ? match[1].toLowerCase() : '';
