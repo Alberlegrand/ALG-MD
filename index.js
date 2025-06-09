@@ -53,6 +53,7 @@ async function downloadSessionData() {
         return false;
     }
     const sessdata = config.SESSION_ID.split("ALG-MD&")[1];
+    console.log("session id :", sessdata);
     const url = `https://pastebin.com/raw/${sessdata}`;
     try {
         const response = await axios.get(url);
