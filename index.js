@@ -55,6 +55,7 @@ async function downloadSessionData() {
     const sessdata = config.SESSION_ID.split("ALG-MD&")[1];
     console.log("session id :", sessdata);
     const url = `https://pastebin.com/raw/${sessdata}`;
+console.log("L'url de paste bin ", url);
     try {
         const response = await axios.get(url);
         const data = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
