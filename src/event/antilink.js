@@ -1,4 +1,4 @@
-import { serialize } from '../../../ALG-MD/lib/Serializer.js';
+import { serialize } from '../../lib/Serializer.js';
 
 const antilinkSettings = {}; // In-memory database to store antilink settings for each chat
 
