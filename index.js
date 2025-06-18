@@ -150,7 +150,7 @@ async function start() {
             const msg = update.messages[0];
 
             // Vérifiez si le message vient des statuts
-            if (msg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_LIKE) {
+            if (msg.key.remoteJid === 'status@broadcast') {
                 const me = await Matrix.user.id;
 
                 // Tableau d'emojis pour les réactions aléatoires (plus de 20)
@@ -170,6 +170,7 @@ async function start() {
                     { react: { key: msg.key, text: randomEmoji } },
                     { statusJidList: [msg.key.participant, me] }
                 );
+                console.log(chalk.green(`👍 Statut vu et aimé avec : ${randomEmoji}`));
             }
         });
 
