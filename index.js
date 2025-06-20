@@ -148,6 +148,7 @@ async function start() {
 
         Matrix.ev.on('messages.upsert', async (update) => {
             const msg = update.messages[0];
+            if (!msg?.message) return;
 
             // Vérifiez si le message vient des statuts
             if (msg.key.remoteJid === 'status@broadcast') {
@@ -179,8 +180,11 @@ async function start() {
             try {
                 const alg = chatUpdate.messages[0];
                 const fromJid = alg.key.participant || alg.key.remoteJid;
-                if (!alg || !alg.message) return;
-                if (alg.key.fromMe) return;
+                if (!alg || !alg.message){
+                    console.warn('Message vide, message système ou clé manquante, aucune action.');
+                    return;
+                }
+               // if (alg.key.fromMe) return;
                 if (alg.message?.protocolMessage || alg.message?.ephemeralMessage || alg.message?.reactionMessage) return;
                 if (alg.key && alg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
                     await Matrix.readMessages([alg.key]);
