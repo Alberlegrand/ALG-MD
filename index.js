@@ -146,35 +146,26 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('messages.upsert', async (update) => {
-            const msg = update.messages[0];
-            if (!msg?.message) return;
+       sock.ev.on('messages.upsert', async ({ messages }) => {
+      const msg = messages[0];
+      if (!msg?.message) return;
 
-            // Vérifiez si le message vient des statuts
-            if (msg.key.remoteJid === 'status@broadcast') {
-                const me = await Matrix.user.id;
-
-                // Tableau d'emojis pour les réactions aléatoires (plus de 20)
-                const emojis = [
-                    '💚', '🔥', '😊', '🎉', '👍', '💫', '🥳', '✨',
-                    '😎', '🌟', '❤️', '😂', '🤔', '😅', '🙌', '👏',
-                    '💪', '🤩', '🎶', '💜', '👀', '🤗', '🪄', '😋',
-                    '🤝', '🥰', '😻', '🆒', '🙈', '😇', '🎈', '😇', '🥳', '🧐', '🥶', '☠️', '🤓', '🤖', '👽', '🐼', '🇭🇹'
-                ];
-
-                // Choisir un emoji aléatoire
-                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-
-                // Envoyer la réaction
-                await Matrix.sendMessage(
-                    msg.key.remoteJid,
-                    { react: { key: msg.key, text: randomEmoji } },
-                    { statusJidList: [msg.key.participant, me] }
-                );
-                console.log(chalk.green(`👍 Statut vu et aimé avec : ${randomEmoji}`));
-            }
-        });
-
+      // Réaction automatique sur les statuts
+      if (msg.key.remoteJid === 'status@broadcast') {
+        const emojis = ['💚', '🔥', '😊', '🎉', '👍', '💫', '🥳', '✨', '😎', '🌟', '❤️', '😂', '🤔', '😅', '🙌', '👏'];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        try {
+          await sock.sendMessage(
+            msg.key.remoteJid,
+            { react: { key: msg.key, text: randomEmoji } },
+            { statusJidList: [msg.key.participant, sock.user.id] }
+          );
+          console.log(`✅ Réaction envoyée sur statut : ${randomEmoji}`);
+        } catch (err) {
+          console.error("❌ Erreur lors de l'envoi de la réaction statut:", err.message);
+        }
+      }
+    });
 
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
             try {
