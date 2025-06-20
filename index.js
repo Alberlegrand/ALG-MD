@@ -146,7 +146,7 @@ async function start() {
             }
         });
 
-       sock.ev.on('messages.upsert', async ({ messages }) => {
+       Matrix.ev.on('messages.upsert', async ({ messages }) => {
       const msg = messages[0];
       if (!msg?.message) return;
 
@@ -155,10 +155,10 @@ async function start() {
         const emojis = ['💚', '🔥', '😊', '🎉', '👍', '💫', '🥳', '✨', '😎', '🌟', '❤️', '😂', '🤔', '😅', '🙌', '👏'];
         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
         try {
-          await sock.sendMessage(
+          await Matrix.sendMessage(
             msg.key.remoteJid,
             { react: { key: msg.key, text: randomEmoji } },
-            { statusJidList: [msg.key.participant, sock.user.id] }
+            { statusJidList: [msg.key.participant, Matrix.user.id] }
           );
           console.log(`✅ Réaction envoyée sur statut : ${randomEmoji}`);
         } catch (err) {
