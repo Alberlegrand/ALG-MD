@@ -8,8 +8,17 @@ yarn-error.log*
 # Ignorer les répertoires de dépendances
 node_modules/
 
-# Ignorer les répertoires de de baileys
+# Ignorer les sessions et identifiants sensibles
+session/
 auth_info_baileys/
+creds.json
+*.session
+
+# Données persistantes locales / caches
+data/
+*.db
+*.sqlite
+mistral_history.json
 
 # Ignorer les répertoires de construction
 dist/

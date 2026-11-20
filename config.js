@@ -53,6 +53,11 @@ const config = {
     scan: process.env.SCAN_URL || "https://hitdev-md-vtsf.onrender.com",
     SESSION_ID: process.env.SESSION_ID || "",
 
+    GEMINI_KEY: process.env.GEMINI_KEY || process.env.GEMINI_API_KEY || "",
+    AI_ASSISTANT_ENABLED: process.env.AI_ASSISTANT_ENABLED !== undefined ? process.env.AI_ASSISTANT_ENABLED === 'true' : true,
+    AI_ASSISTANT_NAME: process.env.AI_ASSISTANT_NAME || "ALG Assistant",
+    AI_MODEL: process.env.AI_MODEL || "gemini-1.5-flash",
+
     // Additional settings
     menu: process.env.MENU || "",
     HANDLERS: process.env.PREFIX || ".",

@@ -9,6 +9,7 @@ import {
     useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
 import { Handler, Callupdate, GroupUpdate } from './src/event/index.js';
+import initDailyBriefing from './src/assistant/dailyBriefing.js';
 import express from 'express';
 import pino from 'pino';
 import fs from 'fs';
@@ -49,21 +50,42 @@ if (!fs.existsSync(sessionDir)) {
 
 async function downloadSessionData() {
     if (!config.SESSION_ID) {
-        console.error('Please add your session to SESSION_ID env !!');
         return false;
     }
-    const sessdata = config.SESSION_ID.split("ALG-MD&")[1];
-    console.log("session id :", sessdata);
-    const url = `https://pastebin.com/raw/${sessdata}`;
-console.log("L'url de paste bin ", url);
+
     try {
-        const response = await axios.get(url);
+        const rawSession = config.SESSION_ID.trim();
+
+        // 1. Session déjà au format JSON brut
+        if (rawSession.startsWith('{') && rawSession.endsWith('}')) {
+            await fs.promises.writeFile(credsPath, rawSession);
+            console.log("🔒 Session JSON chargée directement avec succès !");
+            return true;
+        }
+
+        // 2. Format avec préfixe (ex: ALG-MD&...)
+        const sessdata = rawSession.includes("ALG-MD&") ? rawSession.split("ALG-MD&")[1] : rawSession;
+
+        // 3. Essayer de décoder en Base64
+        try {
+            const decoded = Buffer.from(sessdata, 'base64').toString('utf-8');
+            if (decoded.startsWith('{') && decoded.endsWith('}')) {
+                await fs.promises.writeFile(credsPath, decoded);
+                console.log("🔒 Session Base64 décodée et chargée avec succès !");
+                return true;
+            }
+        } catch (_) {}
+
+        // 4. Téléchargement depuis Pastebin en fallback
+        const url = sessdata.startsWith('http') ? sessdata : `https://pastebin.com/raw/${sessdata}`;
+        console.log("Téléchargement de la session depuis :", url);
+        const response = await axios.get(url, { timeout: 10000 });
         const data = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
         await fs.promises.writeFile(credsPath, data);
-        console.log("🔒 Session Successfully Loaded !!");
+        console.log("🔒 Session téléchargée et chargée avec succès !");
         return true;
     } catch (error) {
-         console.error('Failed to download session data:', error);
+        console.error('Erreur lors du chargement de la session:', error.message || error);
         return false;
     }
 }
@@ -89,6 +111,22 @@ async function start() {
             }
         });
 
+        // Gestion du code de jumelage (Pairing Code)
+        const pairingNumber = config.PAIRING_NUMBER || process.env.PAIRING_NUMBER;
+        if (pairingNumber && !state.creds?.registered) {
+            useQR = false;
+            setTimeout(async () => {
+                try {
+                    let code = await Matrix.requestPairingCode(pairingNumber.replace(/[^0-9]/g, ''));
+                    code = code?.match(/.{1,4}/g)?.join('-') || code;
+                    console.log(chalk.black.bgGreenBright(`\n🔑 CODE DE JUMELAGE WHATSAPP : ${code}\n`));
+                    console.log(chalk.cyan(`👉 Entrez ce code dans WhatsApp > Appareils connectés > Lier avec un numéro de téléphone.\n`));
+                } catch (err) {
+                    console.error("Erreur lors de la demande du code de jumelage:", err.message || err);
+                }
+            }, 3000);
+        }
+
         Matrix.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'close') {
@@ -110,6 +148,9 @@ async function start() {
                     Matrix.sendMessage(Matrix.user.id, {
                         text: `🌟 ALG-MD-CONNECTED 🌟\nStatus: Successful ✅\n🎉 JOIN FOR MORE UPDATES 🎉\n📢 Channel: https://whatsapp.com/channel/0029VaDAkV9FHWqAMMHvb40b`
                     });
+
+                    // Initialisation du briefing quotidien proactif
+                    initDailyBriefing(Matrix);
 
                     initialConnection = false;
                 } else {
