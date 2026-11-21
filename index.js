@@ -126,8 +126,13 @@ async function start() {
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: true,
-            browser: Browsers.ubuntu('Chrome'),
+            browser: Browsers.macOS('Desktop'),
             auth: state,
+            syncFullHistory: false,
+            markOnlineOnConnect: true,
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 10000,
             getMessage: async () => ({ conversation: "ALG-MD whatsapp user bot" })
         });
         currentMatrix = Matrix;
@@ -143,20 +148,24 @@ async function start() {
                 botStatus = 'disconnected';
                 connectedUser = null;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                console.log(chalk.yellow(`⚠️ Connexion fermée (${lastDisconnect?.error?.message || statusCode}). Reconnexion automatique dans 5s...`));
+                const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+                console.log(chalk.yellow(`⚠️ Connexion fermée (${lastDisconnect?.error?.message || statusCode}). Reconnexion : ${!isLoggedOut}`));
                 
-                // Si la session n'est pas enregistrée (ex: QR code expiré code 401), nettoyer pour régénérer un QR frais
-                try {
-                    if (fs.existsSync(credsPath)) {
-                        const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-                        if (!creds?.registered) {
+                // IMPORTANT : Ne JAMAIS supprimer la session lors d'un restart de jumelage (code 515).
+                // On supprime UNIQUEMENT si l'appareil a été déconnecté explicitement (code 401 / loggedOut).
+                if (isLoggedOut) {
+                    console.log(chalk.red("🔒 Appareil déconnecté (Logged out). Réinitialisation de la session locale..."));
+                    try {
+                        if (fs.existsSync(sessionDir)) {
                             fs.rmSync(sessionDir, { recursive: true, force: true });
                             fs.mkdirSync(sessionDir, { recursive: true });
                         }
-                    }
-                } catch (_) {}
+                    } catch (_) {}
+                    currentQR = null;
+                    currentPairingCode = null;
+                }
 
-                setTimeout(() => start(), 5000);
+                setTimeout(() => start(), 3000);
             } else if (connection === 'open') {
                 botStatus = 'connected';
                 currentQR = null;
@@ -287,11 +296,7 @@ async function init() {
             console.log("🔒 Session téléchargée, démarrage du bot.");
             await start();
         } else {
-            console.log("Pas de session active enregistrée, initialisation du QR code Baileys...");
-            if (fs.existsSync(sessionDir)) {
-                fs.rmSync(sessionDir, { recursive: true, force: true });
-                fs.mkdirSync(sessionDir, { recursive: true });
-            }
+            console.log("Pas de session active enregistrée, initialisation de la connexion WhatsApp...");
             useQR = true;
             await start();
         }
