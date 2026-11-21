@@ -9,7 +9,12 @@
     "stop": "pm2 stop ALG-MD",
     "restart": "pm2 restart ALG-MD"
   },
-  "keywords": ["ALG-md", "whatsapp-bot", "ALG-MD", "whatsapp md bot"],
+  "keywords": [
+    "ALG-md",
+    "whatsapp-bot",
+    "ALG-MD",
+    "whatsapp md bot"
+  ],
   "author": "ALG-MD",
   "license": "ISC",
   "dependencies": {
@@ -17,7 +22,7 @@
     "@google/generative-ai": "^0.9.0",
     "@hapi/boom": "^10.0.1",
     "@supabase/supabase-js": "^2.45.0",
-    "@whiskeysockets/baileys": "github:kiuur/bails",
+    "@whiskeysockets/baileys": "^6.7.9",
     "@xaviabot/fb-downloader": "^1.0.14",
     "acrcloud": "^1.4.0",
     "api-dylux": "^1.8.3",

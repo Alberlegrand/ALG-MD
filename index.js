@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+process.on('uncaughtException', (err) => console.error('⚠️ [Erreur Système]', err.message || err));
+process.on('unhandledRejection', (reason) => console.error('⚠️ [Rejet Promesse]', reason?.message || reason));
+
 import {
     makeWASocket,
     Browsers,
@@ -10,6 +13,8 @@ import {
 } from '@whiskeysockets/baileys';
 import { Handler, Callupdate, GroupUpdate } from './src/event/index.js';
 import initDailyBriefing from './src/assistant/dailyBriefing.js';
+import { setupWebDashboard } from './src/assistant/webDashboard.js';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import pino from 'pino';
 import fs from 'fs';
@@ -24,6 +29,15 @@ const { emojis, doReact } = pkg;
 
 const sessionName = "session";
 const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+let currentMatrix = null;
+let currentQR = null;
+let currentPairingCode = null;
+let botStatus = 'disconnected';
+let connectedUser = null;
+
 const orange = chalk.bold.hex("#FFA500");
 const lime = chalk.bold.hex("#32CD32");
 let useQR = true;
@@ -38,7 +52,7 @@ logger.level = "trace";
 
 const msgRetryCounterCache = new NodeCache();
 
-const __filename = new URL(import.meta.url).pathname;
+const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const sessionDir = path.join(__dirname, 'session');
@@ -49,7 +63,7 @@ if (!fs.existsSync(sessionDir)) {
 }
 
 async function downloadSessionData() {
-    if (!config.SESSION_ID) {
+    if (!config.SESSION_ID || config.SESSION_ID === "Your Session Id" || config.SESSION_ID.trim() === "") {
         return false;
     }
 
@@ -93,47 +107,61 @@ async function downloadSessionData() {
 async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-        const { version, isLatest } = await fetchLatestBaileysVersion();
+        let version = [2, 3000, 1043857760];
+        let isLatest = true;
+        try {
+            const vRes = await Promise.race([
+                fetchLatestBaileysVersion(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout version")), 3000))
+            ]);
+            version = vRes.version;
+            isLatest = vRes.isLatest;
+        } catch (_) {}
         console.log(`🤖 ALG-MD using WA v${version.join('.')}, isLatest: ${isLatest}`);
+
+        const pairingNumber = (config.PAIRING_NUMBER || process.env.PAIRING_NUMBER || "").trim();
+        const shouldPair = Boolean(pairingNumber && !state.creds?.registered);
 
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
-            printQRInTerminal: useQR,
-            browser: ["ALG-MD", "safari", "3.3"],
+            printQRInTerminal: true,
+            browser: Browsers.ubuntu('Chrome'),
             auth: state,
-            getMessage: async (key) => {
-                if (store) {
-                    const msg = await store.loadMessage(key.remoteJid, key.id);
-                    return msg.message || undefined;
-                }
-                return { conversation: "ALG-MD whatsapp user bot" };
-            }
+            getMessage: async () => ({ conversation: "ALG-MD whatsapp user bot" })
         });
-
-        // Gestion du code de jumelage (Pairing Code)
-        const pairingNumber = config.PAIRING_NUMBER || process.env.PAIRING_NUMBER;
-        if (pairingNumber && !state.creds?.registered) {
-            useQR = false;
-            setTimeout(async () => {
-                try {
-                    let code = await Matrix.requestPairingCode(pairingNumber.replace(/[^0-9]/g, ''));
-                    code = code?.match(/.{1,4}/g)?.join('-') || code;
-                    console.log(chalk.black.bgGreenBright(`\n🔑 CODE DE JUMELAGE WHATSAPP : ${code}\n`));
-                    console.log(chalk.cyan(`👉 Entrez ce code dans WhatsApp > Appareils connectés > Lier avec un numéro de téléphone.\n`));
-                } catch (err) {
-                    console.error("Erreur lors de la demande du code de jumelage:", err.message || err);
-                }
-            }, 3000);
-        }
+        currentMatrix = Matrix;
 
         Matrix.ev.on('connection.update', (update) => {
-            const { connection, lastDisconnect } = update;
+            const { connection, lastDisconnect, qr } = update;
+            if (qr) {
+                currentQR = qr;
+                botStatus = 'disconnected';
+                console.log(chalk.cyan("📲 Nouveau code QR généré ! Scannez-le ou utilisez le code de jumelage sur le web."));
+            }
             if (connection === 'close') {
-                if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-                    start();
-                }
+                botStatus = 'disconnected';
+                connectedUser = null;
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                console.log(chalk.yellow(`⚠️ Connexion fermée (${lastDisconnect?.error?.message || statusCode}). Reconnexion automatique dans 5s...`));
+                
+                // Si la session n'est pas enregistrée (ex: QR code expiré code 401), nettoyer pour régénérer un QR frais
+                try {
+                    if (fs.existsSync(credsPath)) {
+                        const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+                        if (!creds?.registered) {
+                            fs.rmSync(sessionDir, { recursive: true, force: true });
+                            fs.mkdirSync(sessionDir, { recursive: true });
+                        }
+                    }
+                } catch (_) {}
+
+                setTimeout(() => start(), 5000);
             } else if (connection === 'open') {
+                botStatus = 'connected';
+                currentQR = null;
+                currentPairingCode = null;
+                connectedUser = Matrix.user;
                 if (initialConnection) {
 
                     // Message de connexion dans la console
@@ -232,36 +260,102 @@ async function start() {
         });
 
     } catch (error) {
-        console.error('Critical Error:', error);
-        process.exit(1);
+        console.error('⚠️ [Erreur dans start]:', error.message || error);
+        setTimeout(() => start(), 5000);
     }
 }
 
 
 
 async function init() {
+    let hasValidSession = false;
     if (fs.existsSync(credsPath)) {
-        console.log("🔒 Session file found, proceeding without QR code.");
+        try {
+            const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+            if (creds && creds.registered) {
+                hasValidSession = true;
+                console.log("🔒 Session enregistrée trouvée, démarrage du bot.");
+            }
+        } catch (_) {}
+    }
+
+    if (hasValidSession) {
         await start();
     } else {
         const sessionDownloaded = await downloadSessionData();
         if (sessionDownloaded) {
-            console.log("🔒 Session downloaded, starting bot.");
+            console.log("🔒 Session téléchargée, démarrage du bot.");
             await start();
         } else {
-            console.log("No session found or downloaded, QR code will be printed for authentication.");
+            console.log("Pas de session active enregistrée, initialisation du QR code Baileys...");
+            if (fs.existsSync(sessionDir)) {
+                fs.rmSync(sessionDir, { recursive: true, force: true });
+                fs.mkdirSync(sessionDir, { recursive: true });
+            }
             useQR = true;
             await start();
         }
     }
 }
 
+const botContext = {
+    getState: () => ({
+        status: botStatus,
+        phoneNumber: (config.PAIRING_NUMBER || process.env.PAIRING_NUMBER || "").trim(),
+        pairingCode: currentPairingCode,
+        rawQR: currentQR,
+        user: connectedUser
+    }),
+    requestPairingCode: async (phoneNumber) => {
+        if (!currentMatrix) throw new Error("Client WhatsApp non initialisé.");
+        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        if (!cleanNumber || cleanNumber.length < 8) throw new Error("Numéro de téléphone invalide (minimum 8 chiffres avec indicatif).");
+        botStatus = 'pairing';
+        let code = await currentMatrix.requestPairingCode(cleanNumber);
+        code = code?.match(/.{1,4}/g)?.join('-') || code;
+        currentPairingCode = code;
+        console.log(chalk.black.bgGreenBright(`\n════════════════════════════════════════════════`));
+        console.log(chalk.black.bgGreenBright(`  🔑 CODE DE JUMELAGE GÉNÉRÉ : ${code}  `));
+        console.log(chalk.black.bgGreenBright(`  Pour le numéro : +${cleanNumber}             `));
+        console.log(chalk.black.bgGreenBright(`════════════════════════════════════════════════\n`));
+        return code;
+    },
+    restartConnection: async () => {
+        currentQR = null;
+        currentPairingCode = null;
+        botStatus = 'disconnected';
+        connectedUser = null;
+        if (currentMatrix) {
+            try { currentMatrix.end(); } catch (_) {}
+        }
+        try {
+            if (fs.existsSync(credsPath)) {
+                const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+                if (!creds?.registered) {
+                    fs.rmSync(sessionDir, { recursive: true, force: true });
+                    fs.mkdirSync(sessionDir, { recursive: true });
+                }
+            }
+        } catch (_) {}
+        await start();
+    }
+};
+
+setupWebDashboard(app, botContext);
+
 init();
 
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-});
+function startServer(portToTry) {
+    const server = app.listen(portToTry, () => {
+        console.log(`Server is running on port ${portToTry}`);
+    }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.log(`⚠️ Port ${portToTry} déjà utilisé, basculement sur ${Number(portToTry) + 1}...`);
+            startServer(Number(portToTry) + 1);
+        } else {
+            console.error('Express server error:', err.message);
+        }
+    });
+}
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+startServer(PORT);

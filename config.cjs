@@ -17,7 +17,7 @@ try {
 }
 
 const config = {
-  SESSION_ID: process.env.SESSION_ID || "Your Session Id",
+  SESSION_ID: process.env.SESSION_ID || "",
   PREFIX: process.env.PREFIX || '.',
   AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN !== undefined ? process.env.AUTO_STATUS_SEEN === 'true' : true,
   AUTO_STATUS_LIKE: process.env.AUTO_STATUS_LIKE !== undefined ? process.env.AUTO_STATUS_LIKE === 'true' : true, 

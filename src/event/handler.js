@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { handleAssistantMessage } from '../assistant/aiAssistant.js';
 import reminderManager from '../assistant/reminders.js';
 import groupBuffer from '../assistant/groupBuffer.js';
+import { sendMainMenu } from '../assistant/interactive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,7 +97,34 @@ const Handler = async (chatUpdate, sock, logger) => {
             groupBuffer.record(m.from, senderName, m.body);
         }
 
-        // 1. CAS D'UNE COMMANDE CLASSIQUE (Commence par un préfixe: ., !, #, /)
+        const cleanBody = (m.body || "").trim().toLowerCase();
+
+        // 1. Déclencheur du Menu Interactif avec Boutons & Liste déroulante
+        if (cleanBody === '.menu' || cleanBody === '!menu' || cleanBody === '/menu' || cleanBody === 'menu' || cleanBody === '.help') {
+            await sendMainMenu(sock, m.from, m);
+            return;
+        }
+
+        // 2. Traitement des sélections de la liste interactive
+        if (m.body && m.body.startsWith('action_')) {
+            const actionMap = {
+                'action_ask_ai': "Bonjour ! Présente-toi et dis-moi comment tu peux m'aider aujourd'hui.",
+                'action_inspect_profile': "Que sais-tu sur moi ?",
+                'action_summarize_group': "Fais un résumé des récents messages de ce groupe.",
+                'action_get_notes': "Quelles sont les notes et mémos que tu as enregistrés pour moi ?",
+                'action_currency': "Combien font 100 USD en gourdes haïtiennes HTG ?",
+                'action_make_sticker': "Explique-moi comment je peux créer un sticker avec toi.",
+                'action_create_reminder': "Comment puis-je te demander de me poser un rappel ?",
+                'action_group_link': "Donne-moi le lien d'invitation de ce groupe WhatsApp.",
+                'action_group_info': "Affiche les informations complètes de ce groupe WhatsApp.",
+                'action_web_search': "Fais une recherche sur les dernières actualités importantes."
+            };
+            m.body = actionMap[m.body] || m.body;
+            await handleAssistantMessage(m, sock, logger);
+            return;
+        }
+
+        // 3. CAS D'UNE COMMANDE CLASSIQUE (Commence par un préfixe: ., !, #, /)
         if (hasPrefix) {
             const plugins = await loadPlugins();
             for (const { execute, file } of plugins) {

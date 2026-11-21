@@ -4,6 +4,7 @@ import memory from './memory.js';
 import { geminiToolDeclarations, executeTool } from './tools.js';
 import reminderManager from './reminders.js';
 import learner from './learner.js';
+import { sendInteractiveButtons } from './interactive.js';
 
 const SYSTEM_INSTRUCTION = `
 Tu es ALG Assistant, un assistant personnel et professionnel IA hautement compétent, conçu pour WhatsApp.
@@ -217,7 +218,25 @@ export async function handleAssistantMessage(m, sock, logger) {
         // 6. Sauvegarder dans la mémoire
         if (responseText) {
             memory.addTurn(m.from, userParts, [{ text: responseText }]);
-            await m.reply(responseText);
+
+            // Envoi interactif avec boutons en discussion privée ou texte classique en groupe
+            try {
+                if (!m.isGroup) {
+                    await sendInteractiveButtons(sock, m.from, {
+                        text: responseText,
+                        buttons: [
+                            { text: "📋 Menu Options", id: ".menu" },
+                            { text: "🎙️ Écouter en Vocal", id: "Répète ta réponse précédente sous forme de note vocale audio" }
+                        ],
+                        quoted: m
+                    });
+                } else {
+                    await m.reply(responseText);
+                }
+            } catch (_) {
+                await m.reply(responseText);
+            }
+
             await m.React("✅");
 
             // 7. Apprentissage continu en tâche de fond (sans bloquer la réponse)
