@@ -61,13 +61,38 @@ export const getGroupAdmins = (participants) => {
 
 const Handler = async (chatUpdate, sock, logger) => {
     try {
-        if (chatUpdate.type !== 'notify') return;
+        if (!chatUpdate.messages || !chatUpdate.messages[0]) return;
 
         const m = serialize(JSON.parse(JSON.stringify(chatUpdate.messages[0])), sock, logger);
         if (!m.message) return;
 
+        console.log(`📩 [Message reçu] de ${m.sender || m.from} : "${m.body}"`);
+
         // Liaison de la socket avec le gestionnaire de rappels
         reminderManager.setSocket(sock);
+
+        const botNumber = await sock.decodeJid(sock.user.id);
+        const ownerNumber = (config.OWNER_NUMBER || "").replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        const isCreator = m.sender === ownerNumber || m.sender === botNumber || m.isSelf || Boolean(m.key && m.key.fromMe);
+
+        // Filtrage mode privé/public
+        if (!sock.public && !isCreator) {
+            return;
+        }
+
+        const cleanBody = (m.body || "").trim().toLowerCase();
+        const prefix = config.PREFIX || '.';
+        const menuCommands = new Set([
+            'menu', 'help', 'list',
+            `${prefix}menu`, `${prefix}help`, `${prefix}list`,
+            '.menu', '.help', '!menu', '!help', '/menu', '/help', '#menu', '#help'
+        ]);
+        const command = cleanBody.split(/\s+/, 1)[0];
+        if (menuCommands.has(command)) {
+            console.log(`📋 [Menu demandé] par ${m.sender || m.from} (envoi vers ${m.from})`);
+            await sendMainMenu(sock, m.from, m);
+            return;
+        }
 
         const participants = m.isGroup ? await sock.groupMetadata(m.from).then(metadata => metadata.participants).catch(() => []) : [];
         const groupAdmins = m.isGroup ? getGroupAdmins(participants) : [];
@@ -79,15 +104,6 @@ const Handler = async (chatUpdate, sock, logger) => {
         const isCOMMAND = (body) => PREFIX.test(body);
         const hasPrefix = m.body && isCOMMAND(m.body);
 
-        const botNumber = await sock.decodeJid(sock.user.id);
-        const ownerNumber = (config.OWNER_NUMBER || "").replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        const isCreator = m.sender === ownerNumber || m.sender === botNumber;
-
-        // Filtrage mode privé/public
-        if (!sock.public && !isCreator) {
-            return;
-        }
-
         // Gestion de l'anti-lien dans les groupes
         await handleAntilink(m, sock, logger, isBotAdmins, isAdmins, isCreator);
 
@@ -95,14 +111,6 @@ const Handler = async (chatUpdate, sock, logger) => {
         if (m.isGroup && m.body) {
             const senderName = m.pushName || m.sender.split('@')[0];
             groupBuffer.record(m.from, senderName, m.body);
-        }
-
-        const cleanBody = (m.body || "").trim().toLowerCase();
-
-        // 1. Déclencheur du Menu Interactif avec Boutons & Liste déroulante
-        if (cleanBody === '.menu' || cleanBody === '!menu' || cleanBody === '/menu' || cleanBody === 'menu' || cleanBody === '.help') {
-            await sendMainMenu(sock, m.from, m);
-            return;
         }
 
         // 2. Traitement des sélections de la liste interactive

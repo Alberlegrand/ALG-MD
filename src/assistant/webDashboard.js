@@ -2,11 +2,55 @@ import QRCode from 'qrcode';
 import os from 'os';
 import config from '../../config.cjs';
 import supabaseManager from './supabaseClient.js';
+import { sendMainMenu, sendWelcomeMessage } from './interactive.js';
 
 /**
  * Gestionnaire du tableau de bord Web et des endpoints de connexion
  */
 export function setupWebDashboard(app, botContext) {
+    // Endpoint de test d'envoi de message WhatsApp
+    app.post('/api/send-test', async (req, res) => {
+        try {
+            const matrix = botContext.getMatrix();
+            if (!matrix) return res.status(500).json({ error: "Socket WhatsApp non connectée." });
+            const target = req.body?.to || (botContext.getState().user?.id ? botContext.getState().user.id.split(':')[0] + '@s.whatsapp.net' : "50934567827@s.whatsapp.net");
+            const text = req.body?.text || "🔔 Bonjour Berny ! Test de message depuis ALG-MD WhatsApp Bot.";
+            const result = await matrix.sendMessage(target, { text });
+            res.json({ success: true, target, key: result?.key });
+        } catch (e) {
+            console.error("Erreur api/send-test:", e);
+            res.status(500).json({ error: e.message || String(e) });
+        }
+    });
+
+    // Endpoint pour déclencher l'envoi du menu principal
+    app.post('/api/send-menu', async (req, res) => {
+        try {
+            const matrix = botContext.getMatrix();
+            if (!matrix) return res.status(500).json({ error: "Socket WhatsApp non connectée." });
+            const target = req.body?.to || (botContext.getState().user?.id ? botContext.getState().user.id.split(':')[0] + '@s.whatsapp.net' : "50934567827@s.whatsapp.net");
+            await sendMainMenu(matrix, target);
+            res.json({ success: true, target });
+        } catch (e) {
+            console.error("Erreur api/send-menu:", e);
+            res.status(500).json({ error: e.message || String(e) });
+        }
+    });
+
+    // Endpoint pour déclencher l'envoi du message de bienvenue avec boutons
+    app.post('/api/send-welcome', async (req, res) => {
+        try {
+            const matrix = botContext.getMatrix();
+            if (!matrix) return res.status(500).json({ error: "Socket WhatsApp non connectée." });
+            const target = req.body?.to || (botContext.getState().user?.id ? botContext.getState().user.id.split(':')[0] + '@s.whatsapp.net' : "50934567827@s.whatsapp.net");
+            await sendWelcomeMessage(matrix, target);
+            res.json({ success: true, target });
+        } catch (e) {
+            console.error("Erreur api/send-welcome:", e);
+            res.status(500).json({ error: e.message || String(e) });
+        }
+    });
+
     // 1. Endpoint API : Statut en temps réel
     app.get('/api/status', async (req, res) => {
         const state = botContext.getState();

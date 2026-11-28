@@ -44,7 +44,7 @@ export async function handleAssistantMessage(m, sock, logger) {
         await m.React("💭");
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const modelName = config.AI_MODEL || "gemini-1.5-flash";
+        const modelName = config.AI_MODEL || "gemini-3.5-flash";
         const dynamicSystemInstruction = learner.buildSystemInstruction(m.from, SYSTEM_INSTRUCTION);
         const model = genAI.getGenerativeModel({
             model: modelName,

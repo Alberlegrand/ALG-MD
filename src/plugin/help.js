@@ -2,8 +2,7 @@
 import moment from 'moment-timezone';
 import fs from 'fs';
 import os from 'os';
-import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
-const { generateWAMessageFromContent, proto } = pkg;
+import { generateWAMessageFromContent, proto, prepareWAMessageMedia } from '@whiskeysockets/baileys';
 import config from '../../config.cjs';
 
 // Get total memory and free memory in bytes

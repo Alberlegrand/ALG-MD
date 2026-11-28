@@ -1,7 +1,6 @@
 import config from '../../config.cjs';
-import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
+import { generateWAMessageFromContent, proto, prepareWAMessageMedia } from '@whiskeysockets/baileys';
 import Jimp from 'jimp';
-const { generateWAMessageFromContent, proto } = pkg;
 
 const alive = async (m, Matrix) => {
   const uptimeSeconds = process.uptime();

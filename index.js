@@ -14,6 +14,7 @@ import {
 import { Handler, Callupdate, GroupUpdate } from './src/event/index.js';
 import initDailyBriefing from './src/assistant/dailyBriefing.js';
 import { setupWebDashboard } from './src/assistant/webDashboard.js';
+import { sendWelcomeMessage } from './src/assistant/interactive.js';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import pino from 'pino';
@@ -23,6 +24,7 @@ import path from 'path';
 import chalk from 'chalk';
 import moment from 'moment-timezone';
 import axios from 'axios';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import config from './config.cjs';
 import pkg from './lib/autoreact.cjs';
 const { emojis, doReact } = pkg;
@@ -31,6 +33,9 @@ const sessionName = "session";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Garde le processus Node.js actif en permanence
+setInterval(() => {}, 1000 * 60 * 60);
 
 let currentMatrix = null;
 let currentQR = null;
@@ -44,22 +49,98 @@ let useQR = true;
 let initialConnection = true;
 const PORT = process.env.PORT || 3000;
 
+const isDevelopment = (process.env.NODE_ENV || 'development').toLowerCase() === 'development';
 const MAIN_LOGGER = pino({
+    level: isDevelopment ? 'trace' : 'info',
     timestamp: () => `,"time":"${new Date().toJSON()}"`
 });
 const logger = MAIN_LOGGER.child({});
-logger.level = "trace";
+logger.level = isDevelopment ? 'trace' : 'info';
 
 const msgRetryCounterCache = new NodeCache();
+const sentMessagesCache = new NodeCache({ stdTTL: 3600, checkperiod: 120 });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const sessionDir = path.join(__dirname, 'session');
 const credsPath = path.join(sessionDir, 'creds.json');
+const sessionBundlePrefix = 'ALG-MD&v2:';
 
 if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
+}
+
+function decodeSessionPayload(value) {
+    const raw = value.trim();
+    const candidates = [];
+
+    if (raw.startsWith(sessionBundlePrefix)) {
+        try {
+            const compressed = Buffer.from(raw.slice(sessionBundlePrefix.length), 'base64');
+            candidates.push(gunzipSync(compressed).toString('utf8'));
+        } catch (_) {
+            return null;
+        }
+    } else {
+        const encoded = raw.startsWith('ALG-MD&') ? raw.slice('ALG-MD&'.length) : raw;
+        candidates.push(raw, encoded);
+        try {
+            candidates.push(Buffer.from(encoded, 'base64').toString('utf8'));
+        } catch (_) {}
+    }
+
+    for (const candidate of candidates) {
+        try {
+            return JSON.parse(candidate);
+        } catch (_) {}
+    }
+
+    return null;
+}
+
+async function restoreSessionPayload(value) {
+    const payload = decodeSessionPayload(value);
+    if (!payload || typeof payload !== 'object') return false;
+
+    if (payload.version === 2 && Array.isArray(payload.files)) {
+        const files = new Map();
+        for (const entry of payload.files) {
+            if (!Array.isArray(entry) || entry.length !== 2) {
+                throw new Error('Bundle de session invalide.');
+            }
+            const [name, contents] = entry;
+            if (typeof name !== 'string' || !/^[A-Za-z0-9._-]+\.json$/.test(name) || typeof contents !== 'string') {
+                throw new Error('Fichier invalide dans le bundle de session.');
+            }
+            JSON.parse(contents);
+            files.set(name, contents);
+        }
+
+        const credsRaw = files.get('creds.json');
+        if (!credsRaw) throw new Error('Le bundle de session ne contient pas creds.json.');
+        const creds = JSON.parse(credsRaw);
+        if (!creds?.registered && !creds?.me) {
+            throw new Error('Le bundle de session ne contient pas de credentials enregistrés.');
+        }
+
+        for (const entry of await fs.promises.readdir(sessionDir, { withFileTypes: true })) {
+            if (entry.isFile() && /^[A-Za-z0-9._-]+\.json$/.test(entry.name)) {
+                await fs.promises.unlink(path.join(sessionDir, entry.name));
+            }
+        }
+        await Promise.all([...files].map(([name, contents]) =>
+            fs.promises.writeFile(path.join(sessionDir, name), contents)
+        ));
+        return 'bundle';
+    }
+
+    if (payload.registered || payload.me) {
+        await fs.promises.writeFile(credsPath, JSON.stringify(payload));
+        return 'legacy';
+    }
+
+    return false;
 }
 
 async function downloadSessionData() {
@@ -69,44 +150,91 @@ async function downloadSessionData() {
 
     try {
         const rawSession = config.SESSION_ID.trim();
-
-        // 1. Session déjà au format JSON brut
-        if (rawSession.startsWith('{') && rawSession.endsWith('}')) {
-            await fs.promises.writeFile(credsPath, rawSession);
-            console.log("🔒 Session JSON chargée directement avec succès !");
+        const restored = await restoreSessionPayload(rawSession);
+        if (restored === 'bundle') {
+            console.log("🔒 Session complète restaurée depuis SESSION_ID.");
+            return true;
+        }
+        if (restored === 'legacy') {
+            console.warn("⚠️ SESSION_ID ancien format : seul creds.json a été restauré, pas les clés Baileys.");
             return true;
         }
 
-        // 2. Format avec préfixe (ex: ALG-MD&...)
-        const sessdata = rawSession.includes("ALG-MD&") ? rawSession.split("ALG-MD&")[1] : rawSession;
-
-        // 3. Essayer de décoder en Base64
-        try {
-            const decoded = Buffer.from(sessdata, 'base64').toString('utf-8');
-            if (decoded.startsWith('{') && decoded.endsWith('}')) {
-                await fs.promises.writeFile(credsPath, decoded);
-                console.log("🔒 Session Base64 décodée et chargée avec succès !");
-                return true;
-            }
-        } catch (_) {}
-
-        // 4. Téléchargement depuis Pastebin en fallback
+        const sessdata = rawSession.startsWith('ALG-MD&') ? rawSession.slice('ALG-MD&'.length) : rawSession;
         const url = sessdata.startsWith('http') ? sessdata : `https://pastebin.com/raw/${sessdata}`;
         console.log("Téléchargement de la session depuis :", url);
         const response = await axios.get(url, { timeout: 10000 });
         const data = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-        await fs.promises.writeFile(credsPath, data);
-        console.log("🔒 Session téléchargée et chargée avec succès !");
-        return true;
+        const downloaded = await restoreSessionPayload(data);
+        if (downloaded === 'bundle') {
+            console.log("🔒 Session complète téléchargée et restaurée.");
+            return true;
+        }
+        if (downloaded === 'legacy') {
+            console.warn("⚠️ Session distante ancien format : seul creds.json a été restauré, pas les clés Baileys.");
+            return true;
+        }
+        throw new Error('La session téléchargée n’est ni un bundle ALG-MD v2 ni un fichier credentials valide.');
     } catch (error) {
         console.error('Erreur lors du chargement de la session:', error.message || error);
         return false;
     }
 }
 
+function persistSessionToEnv() {
+    try {
+        if (!fs.existsSync(credsPath)) return;
+        const files = fs.readdirSync(sessionDir, { withFileTypes: true })
+            // Baileys can rebuild these snapshots; excluding them keeps SESSION_ID small enough for deployment variables.
+            .filter(entry =>
+                entry.isFile() &&
+                /^[A-Za-z0-9._-]+\.json$/.test(entry.name) &&
+                !entry.name.startsWith('app-state-sync-version-')
+            )
+            .map(entry => [entry.name, fs.readFileSync(path.join(sessionDir, entry.name), 'utf8')]);
+        const credsRaw = files.find(([name]) => name === 'creds.json')?.[1];
+        if (!credsRaw) return;
+        const creds = JSON.parse(credsRaw);
+        if (!creds?.registered && !creds?.me) return;
+        const bundle = gzipSync(Buffer.from(JSON.stringify({ version: 2, files }), 'utf8')).toString('base64');
+        const sessionString = `${sessionBundlePrefix}${bundle}`;
+
+        const envPath = path.join(__dirname, '.env');
+        if (!fs.existsSync(envPath)) {
+            console.warn("⚠️ Fichier .env absent : la session complète n’a pas pu être exportée. Conservez le dossier session/ sur un stockage persistant.");
+            return;
+        }
+
+        let envContent = fs.readFileSync(envPath, 'utf8');
+        if (/^[ \t]*SESSION_ID[ \t]*=/m.test(envContent)) {
+            envContent = envContent.replace(/^[ \t]*SESSION_ID[ \t]*=.*$/m, `SESSION_ID=${sessionString}`);
+        } else {
+            envContent = `SESSION_ID=${sessionString}\n` + envContent;
+        }
+        fs.writeFileSync(envPath, envContent);
+        console.log("💾 [Persistance] Session complète (credentials + clés) sauvegardée dans .env.");
+    } catch (e) {
+        console.error("Erreur persistance session:", e.message);
+    }
+}
+
 async function start() {
     try {
+        if (currentMatrix) {
+            try {
+                currentMatrix.ev.removeAllListeners();
+                currentMatrix.end();
+            } catch (_) {}
+            currentMatrix = null;
+        }
+
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+        const isRegistered = Boolean(state.creds?.registered || state.creds?.me);
+        if (state.creds?.me && !state.creds?.registered) {
+            state.creds.registered = true;
+            await saveCreds();
+        }
+
         let version = [2, 3000, 1043857760];
         let isLatest = true;
         try {
@@ -119,25 +247,70 @@ async function start() {
         } catch (_) {}
         console.log(`🤖 ALG-MD using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
-        const pairingNumber = (config.PAIRING_NUMBER || process.env.PAIRING_NUMBER || "").trim();
-        const shouldPair = Boolean(pairingNumber && !state.creds?.registered);
-
         const Matrix = makeWASocket({
             version,
-            logger: pino({ level: 'silent' }),
-            printQRInTerminal: true,
-            browser: Browsers.macOS('Desktop'),
+            logger: pino({ level: isDevelopment ? 'debug' : 'silent' }),
+            printQRInTerminal: !isRegistered && useQR,
+            browser: Browsers.ubuntu('Chrome'),
             auth: state,
+            msgRetryCounterCache,
             syncFullHistory: false,
             markOnlineOnConnect: true,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
-            getMessage: async () => ({ conversation: "ALG-MD whatsapp user bot" })
+            patchMessageBeforeSending: (message) => {
+                const requiresPatch = !!(
+                    message.buttonsMessage ||
+                    message.templateMessage ||
+                    message.listMessage ||
+                    message.interactiveMessage
+                );
+                if (requiresPatch && !message.viewOnceMessage) {
+                    message = {
+                        viewOnceMessage: {
+                            message: {
+                                messageContextInfo: {
+                                    deviceListMetadataVersion: 2,
+                                    deviceListMetadata: {},
+                                },
+                                ...message
+                            }
+                        }
+                    };
+                }
+                return message;
+            },
+            getMessage: async (key) => {
+                if (key?.id && sentMessagesCache.has(key.id)) {
+                    return sentMessagesCache.get(key.id);
+                }
+                return undefined;
+            }
         });
+        const sendMessage = Matrix.sendMessage.bind(Matrix);
+        Matrix.sendMessage = async (...args) => {
+            const sent = await sendMessage(...args);
+            if (sent?.key?.id && sent.message) {
+                sentMessagesCache.set(sent.key.id, sent.message);
+            }
+            return sent;
+        };
+        const relayMessage = Matrix.relayMessage.bind(Matrix);
+        Matrix.relayMessage = async (jid, message, options = {}) => {
+            if (options?.messageId && message) {
+                sentMessagesCache.set(options.messageId, message);
+            }
+            return relayMessage(jid, message, options);
+        };
+        Matrix.cacheMessage = (id, message) => {
+            if (id && message) {
+                sentMessagesCache.set(id, message);
+            }
+        };
         currentMatrix = Matrix;
 
-        Matrix.ev.on('connection.update', (update) => {
+        Matrix.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             if (qr) {
                 currentQR = qr;
@@ -149,9 +322,10 @@ async function start() {
                 connectedUser = null;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+                const isConflict = statusCode === DisconnectReason.connectionReplaced || (lastDisconnect?.error?.message && lastDisconnect.error.message.includes('conflict'));
                 console.log(chalk.yellow(`⚠️ Connexion fermée (${lastDisconnect?.error?.message || statusCode}). Reconnexion : ${!isLoggedOut}`));
                 
-                // IMPORTANT : Ne JAMAIS supprimer la session lors d'un restart de jumelage (code 515).
+                // IMPORTANT : Ne JAMAIS supprimer la session lors d'un restart de jumelage (code 515) ou conflit.
                 // On supprime UNIQUEMENT si l'appareil a été déconnecté explicitement (code 401 / loggedOut).
                 if (isLoggedOut) {
                     console.log(chalk.red("🔒 Appareil déconnecté (Logged out). Réinitialisation de la session locale..."));
@@ -165,40 +339,82 @@ async function start() {
                     currentPairingCode = null;
                 }
 
-                setTimeout(() => start(), 3000);
+                const delay = isConflict ? 8000 : 3000;
+                setTimeout(() => start(), delay);
             } else if (connection === 'open') {
                 botStatus = 'connected';
                 currentQR = null;
                 currentPairingCode = null;
                 connectedUser = Matrix.user;
-                if (initialConnection) {
+                console.log(
+                    chalk.greenBright.bold("🌟 ALG-MD-CONNECTED 🌟") +
+                    chalk.white("\nStatus: ") + chalk.green("Successful ✅") +
+                    chalk.cyanBright("\n🎉 Connected as: ") + chalk.yellow(Matrix.user?.name || Matrix.user?.id)
+                );
 
-                    // Message de connexion dans la console
-                    console.log(
-                        chalk.greenBright.bold("🌟 ALG-MD-CONNECTED 🌟") +
-                        chalk.white("\nStatus: ") + chalk.green("Successful ✅") +
-                        chalk.cyanBright("\n🎉 JOIN FOR MORE UPDATES 🎉") +
-                        chalk.blue("\n📢 Channel: ") + chalk.underline.blue("https://whatsapp.com/channel/0029VaDAkV9FHWqAMMHvb40b")
-                    );
-
-                    // Envoi du message de connexion dans Matrix
-                    Matrix.sendMessage(Matrix.user.id, {
-                        text: `🌟 ALG-MD-CONNECTED 🌟\nStatus: Successful ✅\n🎉 JOIN FOR MORE UPDATES 🎉\n📢 Channel: https://whatsapp.com/channel/0029VaDAkV9FHWqAMMHvb40b`
-                    });
-
-                    // Initialisation du briefing quotidien proactif
-                    initDailyBriefing(Matrix);
-
-                    initialConnection = false;
-                } else {
-                    console.log(chalk.blue("♻️ Connection reestablished after restart."));
+                // Envoi du message de connexion interactif avec boutons vers le menu
+                try {
+                    await sendWelcomeMessage(Matrix, Matrix.user.id);
+                } catch (err) {
+                    console.error("Erreur envoi message de bienvenue:", err.message);
                 }
+
+                // Initialisation du briefing quotidien proactif
+                try {
+                    initDailyBriefing(Matrix);
+                } catch (err) {
+                    console.error("Erreur daily briefing:", err.message);
+                }
+                // Persistance automatique de la session dans .env
+                await persistSessionToEnv();
             }
         });
 
-        Matrix.ev.on('creds.update', saveCreds);
+        Matrix.ev.on('creds.update', async () => {
+            await saveCreds();
+            await persistSessionToEnv();
+        });
 
-        Matrix.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, Matrix, logger));
+        // Un seul listener messages.upsert pour éviter la concurrence et les ralentissements
+        Matrix.ev.on("messages.upsert", async (chatUpdate) => {
+            try {
+                // Mise en cache des messages pour répondre aux requêtes de retry de déchiffrement WhatsApp (E2EE)
+                for (const item of chatUpdate.messages || []) {
+                    if (item.key?.id && item.message) {
+                        sentMessagesCache.set(item.key.id, item.message);
+                    }
+                }
+
+                // 1. Exécution du Handler principal (Commandes + Assistant IA + Menu)
+                await Handler(chatUpdate, Matrix, logger);
+
+                const msg = chatUpdate.messages?.[0];
+                if (!msg?.message) return;
+
+                // 2. Réaction automatique sur les messages normaux (si activé)
+                if (!msg.key.fromMe && config.AUTO_REACT && emojis?.length) {
+                    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                    await doReact(randomEmoji, msg, Matrix).catch(() => {});
+                }
+
+                // 3. Statuts WhatsApp : Auto-vu et Auto-réaction
+                if (msg.key.remoteJid === 'status@broadcast') {
+                    if (config.AUTO_STATUS_SEEN) {
+                        await Matrix.readMessages([msg.key]).catch(() => {});
+                    }
+                    const statusEmojis = ['💚', '🔥', '😊', '🎉', '👍', '💫', '🥳', '✨', '😎', '🌟', '❤️', '😂', '🤔', '😅', '🙌', '👏'];
+                    const randomEmoji = statusEmojis[Math.floor(Math.random() * statusEmojis.length)];
+                    await Matrix.sendMessage(
+                        msg.key.remoteJid,
+                        { react: { key: msg.key, text: randomEmoji } },
+                        { statusJidList: [msg.key.participant, Matrix.user.id] }
+                    ).catch(() => {});
+                }
+            } catch (err) {
+                console.error("Erreur dans le traitement de messages.upsert :", err.message || err);
+            }
+        });
+
         Matrix.ev.on("call", async (json) => await Callupdate(json, Matrix));
         Matrix.ev.on("group-participants.update", async (messag) => await GroupUpdate(Matrix, messag));
 
@@ -207,66 +423,6 @@ async function start() {
         } else if (config.MODE === "private") {
             Matrix.public = false;
         }
-
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-            try {
-                const alg = chatUpdate.messages[0];
-                console.log(alg);
-                if (!alg.key.fromMe && config.AUTO_REACT) {
-                    console.log(alg);
-                    if (alg.message) {
-                        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                        await doReact(randomEmoji, alg, Matrix);
-                    }
-                }
-            } catch (err) {
-                console.error('Error during auto reaction:', err);
-            }
-        });
-
-       Matrix.ev.on('messages.upsert', async ({ messages }) => {
-      const msg = messages[0];
-      if (!msg?.message) return;
-
-      // Réaction automatique sur les statuts
-      if (msg.key.remoteJid === 'status@broadcast') {
-        const emojis = ['💚', '🔥', '😊', '🎉', '👍', '💫', '🥳', '✨', '😎', '🌟', '❤️', '😂', '🤔', '😅', '🙌', '👏'];
-        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-        try {
-          await Matrix.sendMessage(
-            msg.key.remoteJid,
-            { react: { key: msg.key, text: randomEmoji } },
-            { statusJidList: [msg.key.participant, Matrix.user.id] }
-          );
-          console.log(`✅ Réaction envoyée sur statut : ${randomEmoji}`);
-        } catch (err) {
-          console.error("❌ Erreur lors de l'envoi de la réaction statut:", err.message);
-        }
-      }
-    });
-
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-            try {
-                const alg = chatUpdate.messages[0];
-                const fromJid = alg.key.participant || alg.key.remoteJid;
-                if (!alg || !alg.message){
-                    console.warn('Message vide, message système ou clé manquante, aucune action.');
-                    return;
-                }
-               // if (alg.key.fromMe) return;
-                if (alg.message?.protocolMessage || alg.message?.ephemeralMessage || alg.message?.reactionMessage) return;
-                if (alg.key && alg.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
-                    await Matrix.readMessages([alg.key]);
-
-                    if (config.AUTO_STATUS_REPLY) {
-                        const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot By ALG-MD';
-                        //await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: alg });
-                    }
-                }
-            } catch (err) {
-                console.error('Error handling messages.upsert event:', err);
-            }
-        });
 
     } catch (error) {
         console.error('⚠️ [Erreur dans start]:', error.message || error);
@@ -278,22 +434,31 @@ async function start() {
 
 async function init() {
     let hasValidSession = false;
+    let hasAuthFiles = false;
     if (fs.existsSync(credsPath)) {
         try {
             const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-            if (creds && creds.registered) {
+            if (creds && (creds.registered || creds.me)) {
                 hasValidSession = true;
-                console.log("🔒 Session enregistrée trouvée, démarrage du bot.");
+                hasAuthFiles = fs.readdirSync(sessionDir, { withFileTypes: true })
+                    .some(entry => entry.isFile() && /^(session|pre-key|sender-key-memory)-.*\.json$/.test(entry.name));
             }
         } catch (_) {}
     }
 
-    if (hasValidSession) {
+    if (hasValidSession && hasAuthFiles) {
+        console.log("🔒 Session enregistrée et fichiers de clés trouvés, démarrage du bot.");
+        useQR = false;
         await start();
     } else {
         const sessionDownloaded = await downloadSessionData();
         if (sessionDownloaded) {
             console.log("🔒 Session téléchargée, démarrage du bot.");
+            useQR = false;
+            await start();
+        } else if (hasValidSession) {
+            console.warn("⚠️ Session locale sans fichiers de clés Baileys; démarrage avec la session locale, mais le chiffrement peut échouer.");
+            useQR = false;
             await start();
         } else {
             console.log("Pas de session active enregistrée, initialisation de la connexion WhatsApp...");
@@ -304,6 +469,7 @@ async function init() {
 }
 
 const botContext = {
+    getMatrix: () => currentMatrix,
     getState: () => ({
         status: botStatus,
         phoneNumber: (config.PAIRING_NUMBER || process.env.PAIRING_NUMBER || "").trim(),
